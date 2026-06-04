@@ -1,6 +1,6 @@
 ---
 title: "Vì sao component re-render"
-description: "Ba nguyên nhân khiến component render lại, batching, state là snapshot, và những hiểu lầm kinh điển về setState"
+description: "Ba nguyên nhân khiến component render lại, cơ chế snapshot & closure, hàng đợi update, batching/flushSync, context, bailout và stale closure — mổ xẻ chi tiết"
 ---
 
 # Vì sao component re-render
@@ -10,11 +10,19 @@ description: "Ba nguyên nhân khiến component render lại, batching, state l
 - [Tổng quan](#tổng-quan)
 - [1. Ba nguyên nhân duy nhất](#1-ba-nguyên-nhân-duy-nhất)
 - [2. State là một snapshot bất biến](#2-state-là-một-snapshot-bất-biến)
+  - [2.1 Vì sao state đứng yên trong một render — closure](#21-vì-sao-state-đứng-yên-trong-một-render--closure)
+  - [2.2 Stale closure — cái bẫy kinh điển](#22-stale-closure--cái-bẫy-kinh-điển)
 - [3. Batching — gộp nhiều setState](#3-batching--gộp-nhiều-setstate)
+  - [3.1 React 18 batch ở mọi nơi](#31-react-18-batch-ở-mọi-nơi)
+  - [3.2 flushSync — thoát khỏi batching khi cần](#32-flushsync--thoát-khỏi-batching-khi-cần)
 - [4. Cập nhật bằng updater function](#4-cập-nhật-bằng-updater-function)
+  - [4.1 Hàng đợi update xử lý ra sao](#41-hàng-đợi-update-xử-lý-ra-sao)
 - [5. Cha re-render → con re-render (mặc định)](#5-cha-re-render--con-re-render-mặc-định)
-- [6. Bailout — khi React bỏ qua re-render](#6-bailout--khi-react-bỏ-qua-re-render)
-- [7. Checklist gỡ rối re-render thừa](#7-checklist-gỡ-rối-re-render-thừa)
+- [6. Context đổi → mọi consumer re-render](#6-context-đổi--mọi-consumer-re-render)
+- [7. Bailout — khi React bỏ qua re-render](#7-bailout--khi-react-bỏ-qua-re-render)
+- [8. Những hiểu lầm thường gặp (FAQ)](#8-những-hiểu-lầm-thường-gặp-faq)
+- [9. Checklist gỡ rối re-render thừa](#9-checklist-gỡ-rối-re-render-thừa)
+- [10. Câu hỏi tự kiểm tra](#10-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -25,6 +33,8 @@ description: "Ba nguyên nhân khiến component render lại, batching, state l
 
 > [!IMPORTANT]
 > Một component re-render **chỉ** vì 3 lý do: (1) **state của chính nó** đổi, (2) **component cha** re-render, hoặc (3) **context** mà nó đang đọc đổi giá trị. Props đổi **không phải** là một nguyên nhân độc lập — props chỉ đổi được khi cha re-render. Ghi nhớ điều này tiết kiệm cho bạn hàng giờ debug.
+
+Bài này dựa trên [Render Pipeline](/react-internals/render-pipeline/) (3 pha) và [Fiber](/react-internals/fiber-reconciliation/) (cơ chế bailout). Nếu chưa đọc, nên đọc trước để hiểu "render" ≠ "đụng DOM".
 
 ---
 
@@ -40,6 +50,17 @@ graph TD
 <Callout type="warn" title="Props không nằm trong danh sách">
 Nhiều người nghĩ "props đổi → con render". Thực ra cơ chế là: cha render → con render (bất kể props có đổi hay không). Props chỉ là dữ liệu cha truyền xuống trong lần render đó. Một component con **vẫn re-render dù props y hệt** nếu cha render — trừ khi bạn dùng `React.memo` (xem chương Tối ưu).
 </Callout>
+
+Một câu hỏi hay gây tranh cãi: *"Đổi ref (`useRef`) có làm re-render không?"* — **Không**. Thay đổi `ref.current` không nằm trong 3 nguyên nhân trên. Đó chính là lý do `useRef` dùng để giữ giá trị "qua các lần render" mà không kích hoạt render.
+
+| Hành động | Có re-render? |
+|-----------|---------------|
+| `setState(giá trị mới)` | ✅ Có |
+| `setState(giá trị y hệt)` | ⚠️ React gọi render 1 lần rồi bailout (xem mục 7) |
+| Cha re-render | ✅ Có (trừ khi `memo` + props không đổi) |
+| Context value đổi | ✅ Mọi consumer re-render |
+| `ref.current = x` | ❌ Không |
+| Đổi biến thường ngoài state | ❌ Không |
 
 ---
 
@@ -69,6 +90,49 @@ Bấm nút: `count` chỉ tăng lên **1**, không phải 3.
 
 **Phép loại suy:** `count` như giá ghi trên menu lúc bạn ngồi xuống. Dù nhà hàng có đổi giá (state mới), tờ menu **của bạn** trong bữa này vẫn in giá cũ. Phải gọi món lần sau (render mới) mới thấy menu mới.
 
+### 2.1 Vì sao state đứng yên trong một render — closure
+
+Mỗi lần render, hàm component **chạy lại từ đầu**, tạo ra một bộ biến `count`, `handleClick`... **mới hoàn toàn**. `handleClick` của lần render này "đóng gói" (closure) đúng giá trị `count` của lần render đó. Vì vậy nó không thể thấy giá trị tương lai.
+
+```mermaid
+graph TD
+    R0["Render #1: count = 0"] --> H0["handleClick #1 nhớ count = 0"]
+    R1["Render #2: count = 1"] --> H1["handleClick #2 nhớ count = 1"]
+```
+
+Mỗi render là một "vũ trụ" riêng với state, props và event handler đóng băng theo nó. Đây không phải bug — đó là mô hình tinh thần đúng của React.
+
+### 2.2 Stale closure — cái bẫy kinh điển
+
+Khi một closure "sống lâu hơn" lần render tạo ra nó (đặt trong `setInterval`, `setTimeout`, listener không cleanup), nó vẫn nhớ state **cũ** → gọi là **stale closure**.
+
+```tsx
+// ❌ SAI: interval tạo ở render đầu, mãi mãi nhớ count = 0
+function BrokenTimer() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCount(count + 1); // count luôn = 0 (closure của render đầu) → mãi set 1
+    }, 1000);
+    return () => clearInterval(id);
+  }, []); // [] → effect chỉ chạy 1 lần → closure đóng băng count = 0
+  return <p>{count}</p>; // dừng ở 1
+}
+
+// ✅ ĐÚNG: updater function đọc giá trị mới nhất từ hàng đợi
+function GoodTimer() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setCount((c) => c + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <p>{count}</p>; // tăng đều
+}
+```
+
+> [!WARNING]
+> Khi callback "sống lâu" cần giá trị state mới nhất: hoặc dùng **updater function** (`c => c + 1`), hoặc đưa state vào dependency array để effect tạo lại closure mới, hoặc lưu vào `useRef`. Đừng đọc trực tiếp biến state trong callback bất đồng bộ tồn tại lâu.
+
 ---
 
 ## 3. Batching — gộp nhiều setState
@@ -84,8 +148,49 @@ function handleClick() {
 }
 ```
 
+```mermaid
+sequenceDiagram
+    participant H as handleClick
+    participant Q as Hàng đợi update
+    participant R as React
+    H->>Q: setA(1)
+    H->>Q: setB(2)
+    H->>Q: setC(3)
+    Note over H: handler chạy xong
+    Q->>R: flush 1 lần
+    R->>R: render DUY NHẤT 1 lần
+```
+
+### 3.1 React 18 batch ở mọi nơi
+
 > [!TIP]
-> Từ **React 18**, batching được tự động áp dụng **ở mọi nơi**: trong event handler, trong `setTimeout`, trong promise `.then`, trong native event. Trước React 18, các update ngoài event handler (vd trong `setTimeout`) **không** được gộp và gây render dư. Nếu bạn nâng cấp từ React cũ và thấy số lần render giảm, đây là lý do.
+> Từ **React 18** (với `createRoot`), batching được tự động áp dụng **ở mọi nơi**: trong event handler, trong `setTimeout`, trong promise `.then`, trong native event. Trước React 18, các update ngoài event handler (vd trong `setTimeout`) **không** được gộp và gây render dư. Nếu bạn nâng cấp từ React cũ và thấy số lần render giảm, đây là lý do.
+
+```tsx
+// React 18: cả 2 setState trong .then vẫn gộp thành 1 render
+fetch('/api').then(() => {
+  setLoading(false);
+  setData(result);
+  // React 17: 2 render. React 18: 1 render.
+});
+```
+
+### 3.2 flushSync — thoát khỏi batching khi cần
+
+Thi thoảng bạn cần DOM cập nhật **ngay lập tức** giữa hai update (ví dụ đo kích thước rồi scroll). `flushSync` ép React commit ngay:
+
+```tsx
+import { flushSync } from 'react-dom';
+
+function onClick() {
+  flushSync(() => setCount((c) => c + 1)); // commit NGAY, DOM đã cập nhật
+  // tại đây DOM đã phản ánh count mới → có thể đo/scroll
+  listRef.current?.scrollTo(0, listRef.current.scrollHeight);
+}
+```
+
+> [!CAUTION]
+> `flushSync` phá vỡ batching → có thể gây nhiều lần render/commit liên tiếp, ảnh hưởng performance. Chỉ dùng khi thật sự cần đọc DOM đã cập nhật giữa chừng.
 
 ---
 
@@ -106,6 +211,29 @@ function handleClick() {
 |-----------|----------------------|--------------|
 | `setCount(count + 1)` | `1` (đều đọc snapshot cũ) | Khi giá trị mới **không** dựa vào cũ |
 | `setCount(c => c + 1)` | `3` (cộng dồn trên hàng đợi) | Khi giá trị mới **dựa vào** giá trị cũ |
+
+### 4.1 Hàng đợi update xử lý ra sao
+
+React không thực thi `setState` ngay; nó **xếp vào hàng đợi**. Khi flush, nó duyệt hàng đợi, lần lượt áp lên một biến tích lũy:
+
+```tsx
+// Hàng đợi sau handler:
+// [ replaceWith(count+1)=1, (c)=>c+1, replaceWith(5), (c)=>c+1 ]
+setCount(count + 1); // count=0 → đẩy "thay bằng 1"
+setCount((c) => c + 1); // đẩy "hàm +1"
+setCount(5);            // đẩy "thay bằng 5"
+setCount((c) => c + 1); // đẩy "hàm +1"
+```
+
+| Bước | Phần tử hàng đợi | Tích lũy |
+|------|------------------|----------|
+| Bắt đầu | — | `0` |
+| 1 | thay bằng `1` | `1` |
+| 2 | `(c) => c + 1` | `2` |
+| 3 | thay bằng `5` | `5` |
+| 4 | `(c) => c + 1` | `6` |
+
+Kết quả cuối: `count = 6`. Hiểu bảng này giúp bạn lý giải mọi hành vi "kỳ lạ" của nhiều `setState` trộn lẫn.
 
 > [!IMPORTANT]
 > Quy tắc an toàn: nếu giá trị mới phụ thuộc giá trị hiện tại của state (đếm, toggle, push vào mảng...) → dùng updater function. Nó cũng giúp bỏ state khỏi mảng phụ thuộc của `useCallback`/`useEffect`.
@@ -144,17 +272,47 @@ graph TD
     C1 --> G1["Cháu render"]
 ```
 
+> [!TIP]
+> Mẹo "children làm slot": nếu truyền component nặng qua prop `children`, nó được tạo ở **component cha cao hơn** và **không** re-render khi state của component giữa thay đổi. Đây là cách tối ưu không cần `memo` — chi tiết ở [Composition](/patterns/composition/).
+
 ---
 
-## 6. Bailout — khi React bỏ qua re-render
+## 6. Context đổi → mọi consumer re-render
+
+Khi `value` của một Context Provider đổi (theo `Object.is`), **tất cả** component đang `useContext` context đó sẽ re-render — bất kể chúng có dùng phần dữ liệu đã đổi hay không.
+
+```tsx
+const ThemeCtx = createContext({ theme: 'light', user: null });
+
+function Provider({ children }) {
+  const [theme, setTheme] = useState('light');
+  const [user, setUser] = useState(null);
+  // ❌ value là object MỚI mỗi render → mọi consumer re-render dù chỉ user đổi
+  return (
+    <ThemeCtx.Provider value={{ theme, user, setTheme, setUser }}>
+      {children}
+    </ThemeCtx.Provider>
+  );
+}
+```
+
+> [!WARNING]
+> Tạo `value={{ ... }}` mới mỗi render khiến **toàn bộ** consumer re-render liên tục. Cách xử lý (memo hóa value, tách context theo tần suất đổi) được trình bày kỹ ở [Context Optimization](/toi-uu-rerender/context-optimization/).
+
+---
+
+## 7. Bailout — khi React bỏ qua re-render
 
 React có một tối ưu sẵn gọi là **bailout**: nếu bạn `setState` với giá trị **y hệt** giá trị hiện tại (so sánh bằng `Object.is`), React **bỏ qua** re-render cho component đó.
 
 ```tsx
 const [n, setN] = useState(0);
 // ...
-setN(0); // n vẫn đang là 0 → React BAILOUT, không re-render
+setN(0); // n vẫn đang là 0 → React BAILOUT, không re-render các con
 ```
+
+> [!NOTE]
+> Một chi tiết tinh tế: khi set cùng giá trị, React **có thể vẫn gọi hàm component đó một lần** rồi mới quyết định bailout (nếu kết quả render giống hệt, nó dừng và không lan xuống con). Nên đừng ngạc nhiên nếu thấy một log render lẻ — điều quan trọng là **subtree con không bị render lại**.
 
 > [!WARNING]
 > Bailout dựa trên `Object.is`. Với **object/array**, tạo object mới có cùng nội dung **không** được coi là bằng nhau → vẫn re-render. Đây là gốc rễ của vấn đề "referential equality" — đọc kỹ ở [bài riêng](/toi-uu-rerender/referential-equality/).
@@ -166,7 +324,29 @@ setUser({ name: 'An' }); // object MỚI dù nội dung giống → KHÔNG bailo
 
 ---
 
-## 7. Checklist gỡ rối re-render thừa
+## 8. Những hiểu lầm thường gặp (FAQ)
+
+<Accordions type="single">
+  <Accordion title="setState xong thì dòng dưới đọc được giá trị mới chưa?">
+    Chưa. State là hằng số trong suốt lần render hiện tại. Giá trị mới chỉ xuất hiện ở lần render kế tiếp. Muốn "phản ứng" với giá trị mới, đặt logic trong render hoặc useEffect, không phải ngay sau setState.
+  </Accordion>
+  <Accordion title="Re-render có nghĩa là DOM bị cập nhật?">
+    Không. Re-render = React gọi lại hàm component. DOM chỉ đổi ở pha commit, và chỉ ở những chỗ thực sự khác. Xem Render Pipeline.
+  </Accordion>
+  <Accordion title="Truyền props giống hệt thì con có render lại không?">
+    Có, nếu cha render. Props giống hệt KHÔNG ngăn re-render — chỉ React.memo (so sánh props) mới ngăn được.
+  </Accordion>
+  <Accordion title="Đổi giá trị trong useRef có làm re-render không?">
+    Không. ref.current là 'ô nhớ thoát khỏi vòng render'. Đổi nó không kích hoạt render — đó là điểm mạnh để giữ giá trị mà không gây render.
+  </Accordion>
+  <Accordion title="Vì sao interval của tôi chỉ tăng tới 1 rồi dừng?">
+    Stale closure: callback nhớ state cũ. Dùng updater function setCount(c => c + 1) hoặc đưa state vào dependency. Xem mục 2.2.
+  </Accordion>
+</Accordions>
+
+---
+
+## 9. Checklist gỡ rối re-render thừa
 
 <Steps>
   <Step>
@@ -189,9 +369,35 @@ setUser({ name: 'An' }); // object MỚI dù nội dung giống → KHÔNG bailo
 
 ---
 
+## 10. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. Ba nguyên nhân duy nhất khiến component re-render là gì?">
+    State của chính nó đổi; component cha re-render; context đang đọc đổi giá trị. Props đổi không phải nguyên nhân độc lập.
+  </Accordion>
+  <Accordion title="2. Vì sao 3 lần setCount(count + 1) chỉ tăng 1?">
+    Vì count là snapshot bất biến trong lần render đó (= 0), cả 3 đều tính 0 + 1. Dùng updater function để cộng dồn.
+  </Accordion>
+  <Accordion title="3. React 18 batch những update nào?">
+    Mọi nơi: event handler, setTimeout, promise .then, native event — miễn dùng createRoot. flushSync để thoát batching khi cần.
+  </Accordion>
+  <Accordion title="4. Khi nào React bailout dù bạn gọi setState?">
+    Khi giá trị mới === giá trị cũ theo Object.is. Lưu ý object/array tạo mới luôn khác tham chiếu nên không bailout.
+  </Accordion>
+  <Accordion title="5. Cách sửa stale closure trong setInterval?">
+    Dùng updater function, hoặc thêm state vào dependency array, hoặc lưu giá trị vào useRef.
+  </Accordion>
+</Accordions>
+
+---
+
 ## Tài liệu tham khảo
 
 - [React Docs — State as a Snapshot](https://react.dev/learn/state-as-a-snapshot)
 - [React Docs — Queueing a Series of State Updates](https://react.dev/learn/queueing-a-series-of-state-updates)
+- [React Docs — flushSync](https://react.dev/reference/react-dom/flushSync)
+- [Render Pipeline](/react-internals/render-pipeline/)
+- [Fiber & Reconciliation](/react-internals/fiber-reconciliation/)
 - [Tổng quan tối ưu re-render](/toi-uu-rerender/tong-quan-toi-uu/)
 - [Referential Equality](/toi-uu-rerender/referential-equality/)
+- [Context Optimization](/toi-uu-rerender/context-optimization/)

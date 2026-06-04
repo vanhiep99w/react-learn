@@ -10,10 +10,13 @@ description: "Gom logic state phức tạp vào reducer, và state reducer patte
 - [Tổng quan](#tổng-quan)
 - [1. Khi useState không còn đủ](#1-khi-usestate-không-còn-đủ)
 - [2. useReducer cơ bản](#2-usereducer-cơ-bản)
+  - [2.1 Khởi tạo lười với hàm init](#21-khởi-tạo-lười-với-hàm-init)
 - [3. Ví dụ: giỏ hàng](#3-ví-dụ-giỏ-hàng)
 - [4. useReducer vs useState](#4-usereducer-vs-usestate)
 - [5. State Reducer Pattern — đảo quyền điều khiển](#5-state-reducer-pattern--đảo-quyền-điều-khiển)
-- [6. Best practices](#6-best-practices)
+- [6. useReducer có phải Redux?](#6-usereducer-có-phải-redux)
+- [7. Best practices](#7-best-practices)
+- [8. Câu hỏi tự kiểm tra](#8-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -86,6 +89,25 @@ graph LR
 
 > [!NOTE]
 > `dispatch` **ổn định** suốt vòng đời component (giống setter của useState) — truyền xuống con hay đưa vào deps đều an toàn, không gây re-render thừa.
+
+### 2.1 Khởi tạo lười với hàm init
+
+`useReducer` nhận **đối số thứ ba** là một hàm `init` để tính state ban đầu **lười** (chỉ chạy một lần khi mount). Hữu ích khi giá trị khởi tạo tốn kém hoặc cần tính từ props:
+
+```tsx
+function init(initialCount: number): State {
+  return { count: initialCount }; // có thể đọc localStorage, parse, v.v.
+}
+
+function Counter({ initialCount }: { initialCount: number }) {
+  // arg2 = initialCount truyền cho init; arg3 = init
+  const [state, dispatch] = useReducer(reducer, initialCount, init);
+  // ...
+}
+```
+
+> [!TIP]
+> Tách `init` ra ngoài giúp tái dùng cho action `'reset'`: `case 'reset': return init(action.payload);` — vừa khởi tạo vừa reset dùng chung một logic.
 
 ---
 
@@ -210,7 +232,24 @@ graph TD
 
 ---
 
-## 6. Best practices
+## 6. useReducer có phải Redux?
+
+Ý tưởng giống nhau (action → reducer → state mới), nhưng phạm vi khác:
+
+| | useReducer | Redux |
+|---|-----------|-------|
+| Phạm vi state | Cục bộ một component (hoặc qua Context) | Store toàn cục một nguồn |
+| Middleware (thunk, saga) | Không | Có |
+| DevTools time-travel | Không (mặc định) | Có |
+| Selector tối ưu re-render | Không (tự lo qua Context) | Có sẵn |
+| Khi nào | State phức tạp một vùng | State toàn cục lớn, nhiều nơi ghi/đọc |
+
+> [!NOTE]
+> `useReducer` + Context có thể thay Redux cho app vừa và nhỏ. Khi cần middleware, time-travel, hoặc selector tối ưu, hãy dùng Redux Toolkit (hoặc Zustand/Jotai) — xem [Tối ưu Context](/toi-uu-rerender/context-optimization/).
+
+---
+
+## 7. Best practices
 
 <Steps>
   <Step>
@@ -230,6 +269,28 @@ graph TD
     `useReducer` + Context (tách state/dispatch) là bộ đôi quản lý state toàn cục nhẹ — xem Provider Pattern & Tối ưu Context.
   </Step>
 </Steps>
+
+---
+
+## 8. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. useReducer và state reducer pattern khác nhau thế nào?">
+    useReducer là hook quản lý state nội bộ. State reducer pattern là kỹ thuật cho phép NGƯỜI DÙNG component truyền reducer riêng để can thiệp logic transition.
+  </Accordion>
+  <Accordion title="2. Vì sao reducer phải là hàm thuần?">
+    Để dự đoán được, dễ test (không cần render/mock), và để React chạy nó an toàn (StrictMode gọi 2 lần). Side effect đặt ở effect/handler.
+  </Accordion>
+  <Accordion title="3. Lợi ích lớn nhất của useReducer so với nhiều useState?">
+    State liên quan (vd items + total) được tính tập trung trong reducer nên không thể lệch nhau, và logic gom một chỗ dễ test.
+  </Accordion>
+  <Accordion title="4. Đối số thứ ba của useReducer dùng làm gì?">
+    Là hàm init để khởi tạo lười state ban đầu (chạy một lần khi mount); tiện cho khởi tạo tốn kém và tái dùng cho action reset.
+  </Accordion>
+  <Accordion title="5. Khi nào nên rời useReducer sang Redux?">
+    Khi cần store toàn cục lớn, middleware (thunk/saga), DevTools time-travel, hoặc selector tối ưu re-render sẵn có.
+  </Accordion>
+</Accordions>
 
 ---
 

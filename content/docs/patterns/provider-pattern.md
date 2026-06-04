@@ -1,6 +1,6 @@
 ---
 title: "Provider Pattern"
-description: "Đóng gói Context thành Provider + custom hook — API sạch, type-safe, và tránh lỗi dùng ngoài Provider"
+description: "Đóng gói Context thành Provider + custom hook — API sạch type-safe, nhận props khởi tạo, persistence với localStorage, lưu ý 'use client' trong Next.js, ghép nhiều provider, performance và testing"
 ---
 
 # Provider Pattern
@@ -11,9 +11,12 @@ description: "Đóng gói Context thành Provider + custom hook — API sạch, 
 - [1. Context "trần" và vấn đề của nó](#1-context-trần-và-vấn-đề-của-nó)
 - [2. Đóng gói: Provider + custom hook](#2-đóng-gói-provider--custom-hook)
 - [3. Ví dụ đầy đủ: ThemeProvider](#3-ví-dụ-đầy-đủ-themeprovider)
-- [4. Ghép nhiều Provider gọn gàng](#4-ghép-nhiều-provider-gọn-gàng)
-- [5. Provider Pattern + performance](#5-provider-pattern--performance)
-- [6. Checklist một Provider tốt](#6-checklist-một-provider-tốt)
+- [4. Provider nhận props khởi tạo](#4-provider-nhận-props-khởi-tạo)
+- [5. Ghép nhiều Provider gọn gàng](#5-ghép-nhiều-provider-gọn-gàng)
+- [6. Provider Pattern + performance](#6-provider-pattern--performance)
+- [7. Lưu ý Next.js: 'use client'](#7-lưu-ý-nextjs-use-client)
+- [8. Checklist một Provider tốt](#8-checklist-một-provider-tốt)
+- [9. Câu hỏi tự kiểm tra](#9-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -117,7 +120,41 @@ function Toolbar() {
 
 ---
 
-## 4. Ghép nhiều Provider gọn gàng
+## 4. Provider nhận props khởi tạo
+
+Một Provider linh hoạt nên cho phép truyền **giá trị ban đầu** và (tuỳ chọn) **đồng bộ với bên ngoài** như `localStorage`:
+
+```tsx
+export function ThemeProvider({
+  children,
+  defaultTheme = 'light',
+}: {
+  children: ReactNode;
+  defaultTheme?: Theme;
+}) {
+  // Khởi tạo lười: đọc localStorage 1 lần khi mount
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return defaultTheme; // an toàn SSR
+    return (localStorage.getItem('theme') as Theme) ?? defaultTheme;
+  });
+
+  // Ghi lại khi đổi
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggle = useCallback(() => setTheme((t) => (t === 'light' ? 'dark' : 'light')), []);
+  const value = useMemo(() => ({ theme, toggle }), [theme, toggle]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+```
+
+> [!WARNING]
+> Truy cập `localStorage`/`window` phải bọc kiểm tra `typeof window === 'undefined'` để không vỡ khi render ở server (SSR). Dùng **khởi tạo lười** (`useState(() => ...)`) để chỉ đọc một lần, không phải mỗi render.
+
+---
+
+## 5. Ghép nhiều Provider gọn gàng
 
 App thật có nhiều Provider lồng nhau → dễ thành "kim tự tháp". Gom lại thành một component:
 
@@ -154,7 +191,7 @@ function AppProviders({ children }: { children: ReactNode }) {
 
 ---
 
-## 5. Provider Pattern + performance
+## 6. Provider Pattern + performance
 
 Một Provider tốt phải `useMemo` cho `value` (như ví dụ trên). Nếu state trong provider đổi **nhiều** và nhiều consumer chỉ cần một phần, áp dụng kỹ thuật ở bài [Tối ưu Context](/toi-uu-rerender/context-optimization/):
 
@@ -177,7 +214,23 @@ export function TodosProvider({ children }: { children: ReactNode }) {
 
 ---
 
-## 6. Checklist một Provider tốt
+## 7. Lưu ý Next.js: 'use client'
+
+Trong Next.js App Router (như repo này), component dùng `createContext`/`useState` là **Client Component** — phải có chỉ thị `'use client'` ở đầu file:
+
+```tsx
+'use client';
+
+import { createContext, useContext, useState } from 'react';
+// ... ThemeProvider, useTheme
+```
+
+> [!IMPORTANT]
+> Server Components **không** dùng được Context (không có state/hook). Đặt Provider ở ranh giới client (vd trong `app/layout.tsx` bọc `{children}`), rồi các Server Component con vẫn render bình thường bên trong nó.
+
+---
+
+## 8. Checklist một Provider tốt
 
 <Steps>
   <Step>
@@ -197,6 +250,28 @@ export function TodosProvider({ children }: { children: ReactNode }) {
     State hay đổi tách khỏi state ít đổi; tách state khỏi dispatch.
   </Step>
 </Steps>
+
+---
+
+## 9. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. Vì sao nên giấu Context và chỉ export Provider + hook?">
+    Để có API gọn (không phải import Context + useContext khắp nơi), type-safe (hết T | null), và có thể ném lỗi rõ ràng khi dùng ngoài Provider.
+  </Accordion>
+  <Accordion title="2. Vì sao hook nên ném lỗi khi ctx === undefined?">
+    Để bắt lỗi 'dùng ngoài Provider' ngay với thông báo rõ, thay vì crash mơ hồ 'Cannot read property of undefined' ở chỗ khác.
+  </Accordion>
+  <Accordion title="3. Vì sao cần useMemo cho value của Provider?">
+    Vì object value tạo mới mỗi render làm mọi consumer re-render dù dữ liệu không đổi (referential equality).
+  </Accordion>
+  <Accordion title="4. Làm sao đọc localStorage an toàn trong Provider?">
+    Bọc kiểm tra typeof window === 'undefined' (tránh vỡ SSR) và dùng khởi tạo lười useState(() => ...) để chỉ đọc một lần.
+  </Accordion>
+  <Accordion title="5. Trong Next.js App Router, Provider cần gì?">
+    Cần 'use client' ở đầu file vì dùng state/hook. Server Components không dùng được Context; đặt Provider ở ranh giới client trong layout.
+  </Accordion>
+</Accordions>
 
 ---
 
