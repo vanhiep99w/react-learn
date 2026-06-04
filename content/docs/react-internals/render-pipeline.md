@@ -1,0 +1,231 @@
+---
+title: "Render Pipeline: Trigger → Render → Commit"
+description: "Ba pha React biến state thành pixel — render là gì, commit là gì, vì sao 'render' không có nghĩa là 'đụng vào DOM'"
+---
+
+# Render Pipeline: Trigger → Render → Commit
+
+## Mục lục
+
+- [Tổng quan](#tổng-quan)
+- [1. Pha Trigger — cái gì khởi động render](#1-pha-trigger--cái-gì-khởi-động-render)
+- [2. Pha Render — gọi component, tính ra cây mới](#2-pha-render--gọi-component-tính-ra-cây-mới)
+  - [2.1 "Render" không phải là "vẽ lên màn hình"](#21-render-không-phải-là-vẽ-lên-màn-hình)
+  - [2.2 Render phải là hàm thuần](#22-render-phải-là-hàm-thuần)
+- [3. Pha Commit — áp thay đổi vào DOM](#3-pha-commit--áp-thay-đổi-vào-dom)
+- [4. Sau Commit — Browser Paint](#4-sau-commit--browser-paint)
+- [5. Ví dụ chạy được: đếm số lần render](#5-ví-dụ-chạy-được-đếm-số-lần-render)
+- [6. Những hiểu lầm thường gặp](#6-những-hiểu-lầm-thường-gặp)
+- [Tài liệu tham khảo](#tài-liệu-tham-khảo)
+
+---
+
+## Tổng quan
+
+Mỗi lần UI cập nhật, React đi qua đúng **3 pha**. Hiểu rạch ròi 3 pha này là nền tảng để sau đó hiểu Fiber, hiểu vì sao re-render, và hiểu mọi kỹ thuật tối ưu.
+
+```mermaid
+graph LR
+    T["1. Trigger<br/>(có gì đó cần update)"] --> R["2. Render<br/>(gọi component → tính cây mới)"]
+    R --> C["3. Commit<br/>(ghi thay đổi vào DOM thật)"]
+    C --> P["Browser Paint<br/>(vẽ pixel)"]
+```
+
+> [!IMPORTANT]
+> Từ **"render"** trong React **không** có nghĩa là "vẽ lên màn hình". Render = React **gọi hàm component của bạn** để biết UI nên trông như thế nào. Việc đụng vào DOM thật chỉ xảy ra ở pha **Commit**. Nhầm lẫn hai khái niệm này là gốc rễ của hầu hết hiểu lầm về performance.
+
+**Phép loại suy đời thường:** hãy tưởng tượng bạn là kiến trúc sư.
+
+| Pha React | Loại suy |
+|-----------|----------|
+| **Trigger** | Khách báo "đổi phòng khách" |
+| **Render** | Bạn vẽ lại **bản thiết kế** trên giấy (chưa đụng vào nhà) |
+| **Commit** | Thợ chỉ sửa **đúng phần khác nhau** giữa bản cũ và bản mới |
+| **Paint** | Sơn khô, mắt người nhìn thấy |
+
+Vẽ lại bản thiết kế (render) rất rẻ. Đập tường xây lại (commit/DOM) mới đắt. React cố tình render nhiều, nhưng commit ít nhất có thể.
+
+---
+
+## 1. Pha Trigger — cái gì khởi động render
+
+Một component chỉ render vì **một trong hai** lý do:
+
+1. **Initial render** — lần đầu app gắn vào DOM (`createRoot(...).render(<App/>)`).
+2. **Re-render** — state của chính nó hoặc của một component cha thay đổi.
+
+```tsx
+import { createRoot } from 'react-dom/client';
+
+// (1) Initial render — chạy đúng 1 lần
+const root = createRoot(document.getElementById('root')!);
+root.render(<App />);
+```
+
+```tsx
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  // (2) Gọi setCount → "trigger" một re-render cho Counter
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+> [!NOTE]
+> `setState` không cập nhật biến ngay lập tức và cũng không render đồng bộ ngay tại dòng đó. Nó **xếp lịch (schedule)** một re-render. Nhiều `setState` trong cùng một sự kiện sẽ được gộp lại — gọi là **batching** — và chỉ render một lần. Chi tiết ở bài [Vì sao component re-render](/react-internals/vi-sao-component-rerender/).
+
+---
+
+## 2. Pha Render — gọi component, tính ra cây mới
+
+Ở pha này React **gọi hàm component**. Hàm trả về JSX, JSX biên dịch thành các lời gọi `React.createElement(...)` tạo ra **React elements** — các object mô tả UI (chưa phải DOM).
+
+```tsx
+// JSX bạn viết:
+return <h1 className="title">Xin chào</h1>;
+
+// Sau khi biên dịch (Babel/SWC):
+return React.createElement('h1', { className: 'title' }, 'Xin chào');
+
+// Kết quả là một object thuần:
+// { type: 'h1', props: { className: 'title', children: 'Xin chào' } }
+```
+
+- **Initial render:** React tạo element cho toàn bộ cây.
+- **Re-render:** React gọi lại các component cần update, tạo cây element **mới**, rồi **so sánh** với cây cũ (reconciliation) để tìm ra điểm khác biệt. Xem bài [Fiber & Reconciliation](/react-internals/fiber-reconciliation/).
+
+### 2.1 "Render" không phải là "vẽ lên màn hình"
+
+Đây là điểm khiến nhiều người hiểu sai performance:
+
+> [!WARNING]
+> Một component **re-render** (hàm bị gọi lại) **không** đồng nghĩa với việc DOM bị thay đổi. Nếu cây element mới giống hệt cây cũ, pha Commit sẽ **không** đụng vào DOM nào cả. Re-render thừa làm tốn CPU (chạy lại hàm + so sánh), nhưng không nhất thiết làm "nhấp nháy" màn hình.
+
+### 2.2 Render phải là hàm thuần
+
+React giả định pha render là **thuần (pure)**: cùng input (props, state, context) → cùng output, và **không có side effect**.
+
+```tsx
+// ❌ SAI: side effect ngay trong thân render
+function Bad() {
+  fetch('/api/log');            // gọi API mỗi lần render
+  someGlobal.count++;           // mutate biến ngoài
+  document.title = 'Xin chào';  // đụng DOM trong render
+  return <div />;
+}
+
+// ✅ ĐÚNG: side effect đặt trong useEffect (chạy sau commit)
+function Good() {
+  useEffect(() => {
+    document.title = 'Xin chào';
+  }, []);
+  return <div />;
+}
+```
+
+> [!IMPORTANT]
+> Vì sao React khắt khe? Vì React có thể **render rồi bỏ đi** (trong Concurrent Mode, render có thể bị tạm dừng, hủy, hoặc chạy hai lần ở Strict Mode để bắt bug). Nếu render có side effect, các side effect đó sẽ chạy lung tung hoặc lặp lại. Hàm thuần cho phép React tự do lên lịch lại công việc.
+
+---
+
+## 3. Pha Commit — áp thay đổi vào DOM
+
+Sau khi render xong và biết **chính xác** chỗ nào khác, React bước vào Commit: thực hiện các thao tác DOM tối thiểu (thêm/xóa/sửa node), rồi chạy các effect tương ứng.
+
+```mermaid
+graph TD
+    A["Render xong: có danh sách thay đổi"] --> B["DOM mutations<br/>(appendChild, removeChild, set attribute)"]
+    B --> C["Chạy cleanup của useLayoutEffect cũ"]
+    C --> D["Chạy useLayoutEffect mới (đồng bộ)"]
+    D --> E["Browser paint"]
+    E --> F["Chạy useEffect (bất đồng bộ, sau paint)"]
+```
+
+Hai loại effect khác nhau ở **thời điểm** chạy trong/ngoài commit:
+
+| Effect | Chạy khi nào | Dùng cho |
+|--------|--------------|----------|
+| `useLayoutEffect` | **Trong** commit, **trước** khi browser paint (đồng bộ) | Đo kích thước DOM, sửa layout trước khi user thấy (tránh nhấp nháy) |
+| `useEffect` | **Sau** khi browser paint (bất đồng bộ) | Fetch data, subscribe, log, đa số trường hợp |
+
+> [!TIP]
+> Mặc định luôn dùng `useEffect`. Chỉ chuyển sang `useLayoutEffect` khi bạn **đọc kích thước/vị trí DOM rồi đồng bộ sửa lại** và thấy màn hình bị giật một frame. `useLayoutEffect` chặn paint nên lạm dụng sẽ làm chậm cảm giác.
+
+---
+
+## 4. Sau Commit — Browser Paint
+
+Sau commit, React trả quyền lại cho trình duyệt. Trình duyệt thực hiện **layout** (tính vị trí) và **paint** (vẽ pixel). Đây là bước duy nhất người dùng thực sự "nhìn thấy". `useEffect` chạy sau bước này nên không làm trễ thời điểm hiển thị.
+
+---
+
+## 5. Ví dụ chạy được: đếm số lần render
+
+Dán đoạn này vào một sandbox để **tận mắt** thấy sự khác nhau giữa "render" và "commit DOM":
+
+```tsx
+import { useState, useRef, useEffect } from 'react';
+
+function RenderTracker({ label }: { label: string }) {
+  const renderCount = useRef(0);
+  renderCount.current++; // tăng trong thân render → đếm số lần HÀM bị gọi
+
+  useEffect(() => {
+    console.log(`[${label}] đã COMMIT lần ${renderCount.current}`);
+  });
+
+  console.log(`[${label}] đang RENDER lần ${renderCount.current}`);
+  return <p>{label} render: {renderCount.current}</p>;
+}
+
+export default function App() {
+  const [, setTick] = useState(0);
+  return (
+    <div>
+      <button onClick={() => setTick((t) => t + 1)}>Re-render App</button>
+      <RenderTracker label="Con" />
+    </div>
+  );
+}
+```
+
+**Quan sát trong console:**
+
+```
+[Con] đang RENDER lần 1     ← pha Render
+[Con] đã COMMIT lần 1        ← pha Commit (sau paint)
+// bấm nút:
+[Con] đang RENDER lần 2     ← render lại vì cha re-render
+[Con] đã COMMIT lần 2
+```
+
+Mỗi lần bấm nút: `App` re-render → kéo theo `Con` re-render. Nhưng vì JSX của `Con` không đổi (chỉ con số đếm trong ref đổi), DOM thực tế gần như không thay đổi. Đây chính là **re-render thừa** — mục tiêu tối ưu ở chương sau.
+
+<Callout type="warn">
+Ở môi trường development có bật **Strict Mode**, bạn sẽ thấy log render xuất hiện **gấp đôi**. React cố tình gọi render 2 lần để phát hiện side effect không thuần. Ở production chỉ chạy 1 lần. Đừng hoảng.
+</Callout>
+
+---
+
+## 6. Những hiểu lầm thường gặp
+
+<Accordions type="single">
+  <Accordion title="Re-render là tốn kém và phải tránh bằng mọi giá?">
+    Sai. Render là gọi một hàm JS — thường rất rẻ. Cái đắt là **DOM mutation** và **các phép tính nặng trong render**. Tối ưu mù quáng (bọc `memo`/`useMemo` khắp nơi) còn làm code chậm và khó đọc hơn. Hãy đo trước (React DevTools Profiler) rồi mới tối ưu.
+  </Accordion>
+  <Accordion title="setState xong là biến state đổi giá trị ngay dòng dưới?">
+    Sai. State là hằng số trong suốt một lần render. `setState` chỉ xếp lịch render mới; giá trị mới chỉ xuất hiện ở lần render kế tiếp. Xem bài Vì sao component re-render.
+  </Accordion>
+  <Accordion title="useEffect chạy trong lúc render?">
+    Sai. `useEffect` chạy **sau** commit và **sau** paint. Đó là lý do bạn không nên đặt logic ảnh hưởng tới UI hiện tại vào đó nếu cần đồng bộ — dùng `useLayoutEffect`.
+  </Accordion>
+</Accordions>
+
+---
+
+## Tài liệu tham khảo
+
+- [React Docs — Render and Commit](https://react.dev/learn/render-and-commit)
+- [React Docs — Keeping Components Pure](https://react.dev/learn/keeping-components-pure)
+- [Fiber & Reconciliation](/react-internals/fiber-reconciliation/)
+- [Vì sao component re-render](/react-internals/vi-sao-component-rerender/)
