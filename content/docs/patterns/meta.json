@@ -1,0 +1,11 @@
+{
+  "title": "React Patterns",
+  "pages": [
+    "composition",
+    "custom-hooks",
+    "compound-components",
+    "render-props",
+    "provider-pattern",
+    "state-reducer"
+  ]
+}
