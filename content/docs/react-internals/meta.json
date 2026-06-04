@@ -4,6 +4,7 @@
     "render-pipeline",
     "fiber-reconciliation",
     "vi-sao-component-rerender",
-    "key-trong-list"
+    "key-trong-list",
+    "strict-mode"
   ]
 }
