@@ -1,6 +1,6 @@
 ---
 title: "Composition"
-description: "Ghép component qua children & slots thay vì kế thừa hay props lồng nhau — nền tảng của mọi pattern React"
+description: "Ghép component qua children & slots thay vì kế thừa — inversion of control, slot pattern, specialization, giải prop drilling, tối ưu performance, và so sánh với HOC. Nền tảng của mọi pattern React"
 ---
 
 # Composition
@@ -9,11 +9,15 @@ description: "Ghép component qua children & slots thay vì kế thừa hay prop
 
 - [Tổng quan](#tổng-quan)
 - [1. Composition thay cho kế thừa](#1-composition-thay-cho-kế-thừa)
+  - [1.1 Specialization: biến thể bằng cách bọc](#11-specialization-biến-thể-bằng-cách-bọc)
 - [2. children — slot mặc định](#2-children--slot-mặc-định)
 - [3. Nhiều slot bằng props](#3-nhiều-slot-bằng-props)
+  - [3.1 children hay slot props?](#31-children-hay-slot-props)
 - [4. Composition giải bài toán prop drilling](#4-composition-giải-bài-toán-prop-drilling)
 - [5. Composition là một tối ưu performance](#5-composition-là-một-tối-ưu-performance)
 - [6. Khi nào chia component](#6-khi-nào-chia-component)
+- [7. Composition vs HOC](#7-composition-vs-hoc)
+- [8. Câu hỏi tự kiểm tra](#8-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -49,6 +53,30 @@ const SuccessButton = (props: { children: React.ReactNode }) => (
 );
 ```
 
+> [!NOTE]
+> Tài liệu React chính thức khẳng định: "chúng tôi chưa từng gặp trường hợp nào cần dùng kế thừa component". Bất cứ cái gì kế thừa làm được, composition đều làm được — gọn và linh hoạt hơn.
+
+### 1.1 Specialization: biến thể bằng cách bọc
+
+"Specialization" là tạo một component **chuyên biệt** từ một component **tổng quát** bằng cách cố định một số props:
+
+```tsx
+// Tổng quát
+function Dialog({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div role="dialog">
+      <h1>{title}</h1>
+      {children}
+    </div>
+  );
+}
+
+// Chuyên biệt: WelcomeDialog là Dialog với title cố định
+function WelcomeDialog({ children }: { children: React.ReactNode }) {
+  return <Dialog title="Chào mừng!">{children}</Dialog>;
+}
+```
+
 ---
 
 ## 2. children — slot mặc định
@@ -68,6 +96,9 @@ function Card({ children }: { children: React.ReactNode }) {
 ```
 
 `Card` không cần biết bên trong là gì — nó chỉ lo phần khung. Đây là **đảo ngược điều khiển (inversion of control)**: nơi dùng quyết định nội dung, component quyết định bố cục.
+
+> [!TIP]
+> "Inversion of control" là chìa khóa: thay vì component cứng nhắc tự dựng mọi thứ bên trong, nó **giao quyền** cho nơi gọi quyết định nội dung. Component càng "không biết" về nội dung càng tái dùng được nhiều.
 
 ---
 
@@ -106,6 +137,18 @@ function PageLayout({ header, sidebar, children, footer }: {
 
 > [!TIP]
 > JSX là giá trị bình thường — truyền được qua bất kỳ prop nào, không chỉ `children`. Dùng tên prop có nghĩa (`header`, `icon`, `actions`) khi có nhiều slot.
+
+### 3.1 children hay slot props?
+
+| Tình huống | Nên dùng |
+|------------|----------|
+| Một vùng nội dung chính | `children` |
+| Nhiều vùng ở vị trí cố định (header/footer/sidebar) | slot props có tên |
+| Nội dung "nằm trong" về mặt ngữ nghĩa | `children` |
+| Nội dung là "cấu hình bố cục" | slot props |
+
+> [!NOTE]
+> Có thể kết hợp: `children` cho nội dung chính + vài slot props có tên cho các vùng phụ. Đừng nhồi mọi thứ vào `children` rồi tự đoán vị trí.
 
 ---
 
@@ -172,7 +215,7 @@ graph TD
     Lặp 2-3 lần → tách thành component nhận props khác nhau.
   </Accordion>
   <Accordion title="Khi một component quá dài / nhiều việc">
-    Một component nên có một trách nhiệm rõ ràng. &gt;200 dòng hay quản lý nhiều mảng state không liên quan = dấu hiệu cần tách.
+    Một component nên có một trách nhiệm rõ ràng. Trên 200 dòng hay quản lý nhiều mảng state không liên quan = dấu hiệu cần tách.
   </Accordion>
   <Accordion title="Khi cần tối ưu re-render cục bộ">
     Tách phần đổi state thành component con để re-render chỉ giới hạn ở đó (colocation).
@@ -184,8 +227,46 @@ graph TD
 
 ---
 
+## 7. Composition vs HOC
+
+Trước hooks, **Higher-Order Component** (HOC — hàm nhận component, trả component mới) là cách tái dùng logic phổ biến. Ngày nay composition + custom hooks thường tốt hơn:
+
+| | HOC | Composition + hooks |
+|---|-----|---------------------|
+| Cách tái dùng | Bọc component | Ghép JSX + dùng [custom hooks](/patterns/custom-hooks/) |
+| Vấn đề | "Wrapper hell", trùng tên prop, khó lần nguồn props | Rõ ràng, dữ liệu đi tường minh |
+| Khi nào còn hợp | Tích hợp lib cũ (vd `connect` của Redux) | Hầu hết trường hợp mới |
+
+> [!TIP]
+> Nếu đang định viết một HOC mới, hãy cân nhắc custom hook (cho logic) + composition (cho UI) trước — gần như luôn gọn hơn và dễ debug hơn.
+
+---
+
+## 8. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. Vì sao React khuyến khích composition thay vì kế thừa?">
+    Vì mọi nhu cầu tái dùng/biến thể đều giải được bằng ghép component + props, gọn và linh hoạt hơn kế thừa. React docs nói chưa từng cần kế thừa component.
+  </Accordion>
+  <Accordion title="2. 'Inversion of control' với children nghĩa là gì?">
+    Component quyết định bố cục, còn nơi gọi quyết định nội dung nhét vào. Component càng ít biết về nội dung càng tái dùng được nhiều.
+  </Accordion>
+  <Accordion title="3. Khi nào dùng slot props thay vì children?">
+    Khi có nhiều vùng nội dung ở vị trí cố định (header/sidebar/footer). children hợp cho một vùng nội dung chính.
+  </Accordion>
+  <Accordion title="4. Vì sao truyền qua children lại là một tối ưu?">
+    Element children được tạo ở cấp cha cao hơn nên không bị tái tạo khi component bọc đổi state → không render lại, không cần memo.
+  </Accordion>
+  <Accordion title="5. Composition có thay thế Context không?">
+    Không hẳn. Nó giảm nhu cầu Context cho drilling theo một nhánh dọc; Context vẫn cần cho dữ liệu dùng ở nhiều nơi rải rác.
+  </Accordion>
+</Accordions>
+
+---
+
 ## Tài liệu tham khảo
 
 - [React Docs — Passing JSX as children](https://react.dev/learn/passing-props-to-a-component#passing-jsx-as-children)
 - [React.memo — phần children](/toi-uu-rerender/react-memo/)
 - [Compound Components](/patterns/compound-components/)
+- [Custom Hooks](/patterns/custom-hooks/)

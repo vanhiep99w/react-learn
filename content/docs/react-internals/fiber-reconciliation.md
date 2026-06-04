@@ -142,30 +142,15 @@ type Fiber = {
 };
 ```
 
-<TypeTable
-  type={{
-    "child / sibling / return": {
-      description: "Ba con trỏ thay thế cho đệ quy. Duyệt depth-first: xuống child, hết thì sang sibling, hết nữa thì return lên cha.",
-      type: "Fiber | null"
-    },
-    "alternate": {
-      description: "Cầu nối giữa cây current (đang hiển thị) và WIP (đang dựng). Mỗi fiber có tối đa 2 phiên bản, trỏ nhau qua alternate.",
-      type: "Fiber | null"
-    },
-    "flags": {
-      description: "Bitmask đánh dấu việc cần làm ở commit: thêm/xoá/sửa node, chạy effect...",
-      type: "number (bitmask)"
-    },
-    "subtreeFlags": {
-      description: "Gộp flags của con cháu. Nếu = 0, React BỎ QUA cả nhánh khi commit — tối ưu lớn.",
-      type: "number (bitmask)"
-    },
-    "lanes": {
-      description: "Mức ưu tiên của update. Quyết định update nào được xử lý trước (gõ phím vs render nền).",
-      type: "number (bitmask)"
-    }
-  }}
-/>
+Diễn giải các trường "khó" nhất:
+
+| Trường | Kiểu | Vai trò |
+|--------|------|---------|
+| `child` / `sibling` / `return` | `Fiber \| null` | Ba con trỏ thay thế cho đệ quy. Duyệt depth-first: xuống `child`, hết thì sang `sibling`, hết nữa thì `return` lên cha. |
+| `alternate` | `Fiber \| null` | Cầu nối giữa cây current (đang hiển thị) và WIP (đang dựng). Mỗi fiber có tối đa 2 phiên bản, trỏ nhau qua `alternate`. |
+| `flags` | `number` (bitmask) | Đánh dấu việc cần làm ở commit: thêm/xoá/sửa node, chạy effect... |
+| `subtreeFlags` | `number` (bitmask) | Gộp flags của con cháu. Nếu `= 0`, React **bỏ qua** cả nhánh khi commit — tối ưu lớn. |
+| `lanes` | `number` (bitmask) | Mức ưu tiên của update. Quyết định update nào được xử lý trước (gõ phím vs render nền). |
 
 ### 2.2 Vì sao hooks là linked list trong memoizedState
 

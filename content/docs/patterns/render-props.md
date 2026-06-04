@@ -1,6 +1,6 @@
 ---
 title: "Render Props & HOC"
-description: "Hai pattern chia sẻ logic thời tiền-hook — cách hoạt động, vì sao custom hook thay thế chúng, và khi nào vẫn cần"
+description: "Hai pattern chia sẻ logic thời tiền-hook — render prop & children-as-function, HOC và quy tắc viết đúng, wrapper hell, vì sao custom hook thay thế, lưu ý performance, và khi nào vẫn cần"
 ---
 
 # Render Props & HOC
@@ -10,10 +10,14 @@ description: "Hai pattern chia sẻ logic thời tiền-hook — cách hoạt đ
 - [Tổng quan](#tổng-quan)
 - [1. Render Props là gì](#1-render-props-là-gì)
 - [2. Ví dụ: MouseTracker](#2-ví-dụ-mousetracker)
+  - [2.1 render prop vs children-as-function](#21-render-prop-vs-children-as-function)
 - [3. Higher-Order Component (HOC)](#3-higher-order-component-hoc)
+  - [3.1 Ba quy tắc viết HOC đúng](#31-ba-quy-tắc-viết-hoc-đúng)
 - [4. Vấn đề: wrapper hell](#4-vấn-đề-wrapper-hell)
 - [5. Custom hook thay thế cả hai](#5-custom-hook-thay-thế-cả-hai)
-- [6. Khi nào vẫn nên dùng](#6-khi-nào-vẫn-nên-dùng)
+- [6. Lưu ý performance của render props](#6-lưu-ý-performance-của-render-props)
+- [7. Khi nào vẫn nên dùng](#7-khi-nào-vẫn-nên-dùng)
+- [8. Câu hỏi tự kiểm tra](#8-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -39,7 +43,7 @@ Một component nhận một **hàm** qua prop (thường là `children` hoặc 
 <DataProvider>{(data) => <h1>{data.title}</h1>}</DataProvider>
 ```
 
-Component giữ **logic + state**; nơi dùng quyết định **giao diện** từ dữ liệu đó.
+Component giữ **logic + state**; nơi dùng quyết định **giao diện** từ dữ liệu đó. Đây là một dạng [inversion of control](/patterns/composition/) — nhưng thay vì giao "nội dung tĩnh" (children thường), ta giao một **hàm** nhận dữ liệu động.
 
 ---
 
@@ -71,6 +75,18 @@ function App() {
 ```
 
 `Mouse` không quyết định hiển thị gì — nó đưa toạ độ cho hàm con. Logic theo dõi chuột được tái dùng cho mọi cách render.
+
+### 2.1 render prop vs children-as-function
+
+Cùng một ý tưởng, hai cú pháp:
+
+| Cách | Cú pháp | Khi nào |
+|------|---------|---------|
+| Prop tên `render` | `<X render={(d) => ...} />` | Khi cần nhiều "slot hàm" (render, renderHeader, renderRow) |
+| `children` là hàm | `<X>{(d) => ...}</X>` | Khi chỉ có một vùng render — đọc tự nhiên hơn |
+
+> [!NOTE]
+> Cả hai hoàn toàn tương đương về cơ chế: component bên trong gọi hàm và truyền dữ liệu vào. Chọn cái nào là vấn đề khẩu vị/đọc hiểu.
 
 ---
 
@@ -104,6 +120,23 @@ const BarWithWidth = withWindowWidth(Bar);
 > [!NOTE]
 > `connect()` của Redux cũ, `withRouter` của React Router cũ đều là HOC. Bạn vẫn gặp chúng nhiều trong codebase đời trước.
 
+### 3.1 Ba quy tắc viết HOC đúng
+
+<Steps>
+  <Step>
+    ### Truyền xuyên props không liên quan
+    HOC chỉ nên thêm/sửa props nó phụ trách, còn lại `{...props}` chuyển thẳng cho component bọc.
+  </Step>
+  <Step>
+    ### Không gọi HOC trong render
+    `const Enhanced = withX(Comp)` phải nằm ở **module scope**. Gọi trong render tạo component mới mỗi lần → remount, mất state.
+  </Step>
+  <Step>
+    ### Copy static & đặt displayName
+    Sao chép static methods (hoặc dùng `hoist-non-react-statics`) và đặt `Enhanced.displayName = 'withX(Comp)'` để DevTools dễ đọc.
+  </Step>
+</Steps>
+
 ---
 
 ## 4. Vấn đề: wrapper hell
@@ -131,7 +164,7 @@ export default withAuth(withTheme(withData(withRouter(Page))));
 ```mermaid
 graph TD
     A["withAuth"] --> B["withTheme"] --> C["withData"] --> D["withRouter"] --> E["Page thật"]
-    note["Mỗi tầng thêm 1 component vào cây<br/>→ DevTools rối, props khó truy nguồn"]
+    E --> N["Mỗi tầng thêm 1 component vào cây<br/>→ DevTools rối, props khó truy nguồn"]
 ```
 
 ---
@@ -171,11 +204,25 @@ function Page() {
 
 ---
 
-## 6. Khi nào vẫn nên dùng
+## 6. Lưu ý performance của render props
+
+Hàm render prop viết **inline** được tạo mới mỗi render của cha → nếu component nhận nó bọc `memo`, memo sẽ vô hiệu (xem [Referential Equality](/toi-uu-rerender/referential-equality/)):
+
+```tsx
+// Mỗi lần Parent render, hàm này là tham chiếu mới
+<Mouse>{(pos) => <Dot pos={pos} />}</Mouse>
+```
+
+> [!WARNING]
+> Thường thì điều này **không đáng lo** vì render prop bản chất phải chạy lại khi dữ liệu nội bộ đổi. Chỉ để tâm khi component chứa render prop nặng và bạn đang cố memo hóa — khi đó cân nhắc `useCallback` cho hàm render hoặc chuyển sang custom hook.
+
+---
+
+## 7. Khi nào vẫn nên dùng
 
 <Accordions type="single">
   <Accordion title="Render props: khi cần chia sẻ CÁCH RENDER">
-    Khi component cần để nơi dùng quyết định render gì từ dữ liệu/trạng thái nội bộ — vd &lt;Virtualizer&gt;, &lt;Tooltip&gt; cho phép custom nội dung, list ảo hóa. Hook không truyền JSX ngược lên được.
+    Khi component cần để nơi dùng quyết định render gì từ dữ liệu/trạng thái nội bộ — vd Virtualizer, Tooltip cho phép custom nội dung, list ảo hóa. Hook không truyền JSX ngược lên được.
   </Accordion>
   <Accordion title="HOC: khi bọc cross-cutting cho component bất kỳ">
     Khi cần áp một hành vi lên nhiều component có sẵn mà không sửa từng cái (vd error boundary wrapper, analytics tracking, code cũ của thư viện).
@@ -187,8 +234,31 @@ function Page() {
 
 ---
 
+## 8. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. Render prop khác children thường ở điểm nào?">
+    children thường là JSX tĩnh; render prop là một HÀM nhận dữ liệu nội bộ và trả JSX, cho phép nơi dùng render theo state của component.
+  </Accordion>
+  <Accordion title="2. HOC là gì?">
+    Một hàm nhận một component và trả về component mới đã bọc thêm logic/props. Quy ước tên with*.
+  </Accordion>
+  <Accordion title="3. Vì sao không gọi withX(Comp) trong render?">
+    Mỗi render tạo một component mới → React remount, mất state. Phải đặt ở module scope.
+  </Accordion>
+  <Accordion title="4. Vì sao custom hook thường thắng cả render props lẫn HOC?">
+    Vì hook chia sẻ logic mà KHÔNG thêm tầng vào cây component, dữ liệu đi tường minh, không 'wrapper hell', không trùng tên prop.
+  </Accordion>
+  <Accordion title="5. Khi nào render props vẫn hơn hook?">
+    Khi cần để NƠI DÙNG quyết định cách render từ trạng thái nội bộ (vd list ảo hóa, tooltip custom). Hook không trả JSX ngược lên cây được.
+  </Accordion>
+</Accordions>
+
+---
+
 ## Tài liệu tham khảo
 
 - [React (legacy) — Render Props](https://legacy.reactjs.org/docs/render-props.html)
 - [React (legacy) — Higher-Order Components](https://legacy.reactjs.org/docs/higher-order-components.html)
 - [Custom Hooks](/patterns/custom-hooks/)
+- [Composition](/patterns/composition/)

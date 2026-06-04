@@ -1,6 +1,6 @@
 ---
 title: "Code-splitting & lazy loading"
-description: "Chia nhỏ bundle bằng React.lazy + Suspense, route-based splitting, và tránh waterfall"
+description: "Chia nhỏ bundle bằng React.lazy + Suspense — cơ chế lazy/Suspense hoạt động, route vs component splitting, next/dynamic, Error Boundary, tránh waterfall & layout shift, và preload thông minh"
 ---
 
 # Code-splitting & lazy loading
@@ -10,10 +10,15 @@ description: "Chia nhỏ bundle bằng React.lazy + Suspense, route-based splitt
 - [Tổng quan](#tổng-quan)
 - [1. Vấn đề: bundle một cục](#1-vấn-đề-bundle-một-cục)
 - [2. React.lazy + Suspense](#2-reactlazy--suspense)
+  - [2.1 Cơ chế: lazy & Suspense hoạt động thế nào](#21-cơ-chế-lazy--suspense-hoạt-động-thế-nào)
+  - [2.2 Bắt lỗi tải bằng Error Boundary](#22-bắt-lỗi-tải-bằng-error-boundary)
 - [3. Route-based splitting](#3-route-based-splitting)
 - [4. Component-based splitting](#4-component-based-splitting)
+  - [4.1 next/dynamic trong Next.js](#41-nextdynamic-trong-nextjs)
 - [5. Bẫy: lazy trong render & layout shift](#5-bẫy-lazy-trong-render--layout-shift)
-- [6. Preload thông minh](#6-preload-thông-minh)
+- [6. Bẫy: waterfall khi lazy lồng nhau](#6-bẫy-waterfall-khi-lazy-lồng-nhau)
+- [7. Preload thông minh](#7-preload-thông-minh)
+- [8. Câu hỏi tự kiểm tra](#8-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -42,6 +47,9 @@ graph LR
     D -.tải khi cần.-> F["charts.js"]
     end
 ```
+
+> [!TIP]
+> Đo bundle trước khi split: với Next.js xem cột "First Load JS" khi `next build`, hoặc dùng `@next/bundle-analyzer`. Với Vite/webpack dùng `rollup-plugin-visualizer`/`webpack-bundle-analyzer`. Tách cái **to và ít dùng** trước.
 
 ---
 
@@ -72,6 +80,37 @@ export default function Dashboard() {
 
 > [!NOTE]
 > Component truyền cho `lazy` phải là **default export**. Nếu là named export, bọc lại: `lazy(() => import('./m').then(m => ({ default: m.Named })))`.
+
+### 2.1 Cơ chế: lazy & Suspense hoạt động thế nào
+
+`lazy` trả về một component đặc biệt. Lần đầu render, nó gọi `import()` (trả về một Promise) và **"ném" (throw) chính Promise đó**. `Suspense` cha bắt lấy Promise này, hiển thị `fallback`, và đăng ký render lại khi Promise resolve.
+
+```mermaid
+graph TD
+    A["Render <Chart/> lần đầu"] --> B["lazy gọi import('./Chart')"]
+    B --> C["throw Promise (chunk chưa có)"]
+    C --> D["Suspense cha bắt → hiện fallback"]
+    D --> E["Chunk tải xong → Promise resolve"]
+    E --> F["React render lại → Chart hiện thật"]
+```
+
+> [!NOTE]
+> Đây là cùng cơ chế Suspense dùng cho data fetching: "ném" một Promise để báo "tôi chưa sẵn sàng, hãy hiện fallback". Hiểu điều này giúp bạn dùng Suspense nhất quán cho cả code-splitting lẫn data.
+
+### 2.2 Bắt lỗi tải bằng Error Boundary
+
+Nếu mạng lỗi, `import()` reject → component lazy ném lỗi. `Suspense` **không** bắt lỗi (chỉ bắt trạng thái chờ). Bọc thêm **Error Boundary** để xử lý:
+
+```tsx
+<ErrorBoundary fallback={<p>Tải thất bại. Thử lại.</p>}>
+  <Suspense fallback={<Spinner />}>
+    <Chart />
+  </Suspense>
+</ErrorBoundary>
+```
+
+> [!WARNING]
+> Thiếu Error Boundary, một lỗi tải chunk (vd user mất mạng giữa chừng, hoặc deploy mới làm chunk cũ 404) sẽ làm sập cả nhánh UI. Luôn ghép Suspense với Error Boundary cho lazy.
 
 ---
 
@@ -117,6 +156,27 @@ Tách những component **nặng** và **không phải lúc nào cũng hiện**:
 | Bản đồ | Tải SDK bản đồ tốn kém |
 | Tab ẩn | Chưa chắc user mở |
 
+### 4.1 next/dynamic trong Next.js
+
+Trong Next.js, dùng `next/dynamic` thay cho `React.lazy` — nó hỗ trợ SSR và cho phép tắt SSR cho component chỉ chạy ở client:
+
+```tsx
+import dynamic from 'next/dynamic';
+
+// Component nặng, chỉ chạy ở client (vd dùng window/canvas)
+const Map = dynamic(() => import('@/components/Map'), {
+  loading: () => <p>Đang tải bản đồ…</p>,
+  ssr: false, // không render ở server
+});
+
+export default function Page() {
+  return <Map />;
+}
+```
+
+> [!NOTE]
+> `ssr: false` hữu ích cho thư viện đụng tới `window`/`document` (chỉ có ở trình duyệt). Với component bình thường, để mặc định `ssr: true` để vẫn có HTML từ server.
+
 ---
 
 ## 5. Bẫy: lazy trong render & layout shift
@@ -144,7 +204,23 @@ function Good() {
 
 ---
 
-## 6. Preload thông minh
+## 6. Bẫy: waterfall khi lazy lồng nhau
+
+Nếu component lazy A bên trong lại render component lazy B, hai chunk tải **tuần tự** (A xong mới biết cần B) → chậm:
+
+```mermaid
+graph LR
+    A["tải A.js"] --> B["render A → mới biết cần B"]
+    B --> C["tải B.js"]
+    C --> D["hiện"]
+```
+
+> [!TIP]
+> Tránh waterfall: đặt các ranh giới lazy ở cùng một tầng (song song) thay vì lồng sâu, hoặc preload B ngay khi bắt đầu tải A. Một `Suspense` bao nhiều lazy anh em sẽ tải song song.
+
+---
+
+## 7. Preload thông minh
 
 Tải trước chunk **ngay trước khi** user cần (vd khi hover vào link), để khi bấm thì đã sẵn sàng — vừa nhanh vừa không tốn băng thông lúc đầu.
 
@@ -174,6 +250,28 @@ sequenceDiagram
 
 > [!TIP]
 > Cân bằng: preload quá sớm/quá nhiều thì lại tải thừa như khi không split. Preload theo tín hiệu ý định của user (hover, focus, sắp scroll tới) là điểm ngọt.
+
+---
+
+## 8. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. React.lazy báo cho Suspense biết 'đang tải' bằng cách nào?">
+    Component lazy 'ném' (throw) chính Promise của import() khi chunk chưa có. Suspense cha bắt Promise đó, hiện fallback, và render lại khi resolve.
+  </Accordion>
+  <Accordion title="2. Suspense có bắt lỗi tải chunk không?">
+    Không. Suspense chỉ xử lý trạng thái chờ. Lỗi tải (mạng/404) cần Error Boundary bọc ngoài.
+  </Accordion>
+  <Accordion title="3. Vì sao không được khai báo lazy() trong thân component?">
+    Mỗi render tạo một lazy component mới → React coi là type khác → remount, mất state, tải lại. Đặt ở module scope.
+  </Accordion>
+  <Accordion title="4. Khi nào dùng ssr:false với next/dynamic?">
+    Khi component đụng tới window/document (chỉ có ở client) hoặc thư viện không chạy được ở server.
+  </Accordion>
+  <Accordion title="5. Waterfall trong lazy là gì và tránh thế nào?">
+    Là việc các chunk tải tuần tự vì lazy lồng nhau (A xong mới biết cần B). Tránh bằng cách đặt ranh giới lazy song song cùng tầng hoặc preload sớm.
+  </Accordion>
+</Accordions>
 
 ---
 

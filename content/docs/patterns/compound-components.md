@@ -1,6 +1,6 @@
 ---
 title: "Compound Components"
-description: "Nhóm component chia sẻ state ngầm qua Context — API kiểu <Tabs><Tab/></Tabs>, linh hoạt và biểu cảm"
+description: "Nhóm component chia sẻ state ngầm qua Context — API kiểu <Tabs><Tab/></Tabs>, controlled vs uncontrolled, cloneElement vs Context, accessibility, ưu nhược điểm và thư viện thực tế"
 ---
 
 # Compound Components
@@ -13,7 +13,10 @@ description: "Nhóm component chia sẻ state ngầm qua Context — API kiểu 
 - [3. Cài đặt với Context](#3-cài-đặt-với-context)
 - [4. Dùng và vì sao nó linh hoạt](#4-dùng-và-vì-sao-nó-linh-hoạt)
 - [5. Gắn component con làm thuộc tính](#5-gắn-component-con-làm-thuộc-tính)
-- [6. Ưu / nhược điểm](#6-ưu--nhược-điểm)
+- [6. Controlled vs uncontrolled](#6-controlled-vs-uncontrolled)
+- [7. cloneElement: cách cũ và vì sao tránh](#7-cloneelement-cách-cũ-và-vì-sao-tránh)
+- [8. Ưu / nhược điểm](#8-ưu--nhược-điểm)
+- [9. Câu hỏi tự kiểm tra](#9-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -45,7 +48,7 @@ Một component "all-in-one" cấu hình qua props sẽ phình to khó kiểm so
 />
 ```
 
-Mỗi nhu cầu mới = thêm một prop. Cuối cùng component có 20 props và vẫn không đủ linh hoạt.
+Mỗi nhu cầu mới = thêm một prop. Cuối cùng component có 20 props và vẫn không đủ linh hoạt. Hiện tượng này gọi là **"prop explosion"** hay **"apropcalypse"**.
 
 ---
 
@@ -140,6 +143,9 @@ graph TD
 
 Người dùng **toàn quyền** về bố cục, thứ tự, nội dung mỗi mảnh; bạn chỉ quản lý logic "tab nào đang chọn". Đây là **inversion of control** ở mức cao.
 
+> [!NOTE]
+> Vì các mảnh con đọc state qua Context, hãy nhớ bài học ở [Tối ưu Context](/toi-uu-rerender/context-optimization/): nếu value của Provider tạo mới mỗi render, mọi mảnh sẽ re-render. Với UI nhỏ thường không sao; với widget lớn, cân nhắc `useMemo` cho context value.
+
 ---
 
 ## 5. Gắn component con làm thuộc tính
@@ -159,7 +165,56 @@ export { Tabs };
 
 ---
 
-## 6. Ưu / nhược điểm
+## 6. Controlled vs uncontrolled
+
+Như input HTML, compound component nên hỗ trợ cả hai chế độ:
+
+```tsx
+// Uncontrolled: Tabs tự giữ state, chỉ cần giá trị mặc định
+<Tabs defaultValue="a">...</Tabs>
+
+// Controlled: cha giữ state, Tabs nhận value + onValueChange
+<Tabs value={tab} onValueChange={setTab}>...</Tabs>
+```
+
+```tsx
+function Tabs({ value: controlled, defaultValue, onValueChange, children }: Props) {
+  const [uncontrolled, setUncontrolled] = useState(defaultValue);
+  const isControlled = controlled !== undefined;
+  const value = isControlled ? controlled : uncontrolled;
+  const setValue = (v: string) => {
+    if (!isControlled) setUncontrolled(v);
+    onValueChange?.(v);
+  };
+  return <TabsContext.Provider value={{ value, setValue }}>{children}</TabsContext.Provider>;
+}
+```
+
+> [!TIP]
+> Đây chính là cách các thư viện thật (Radix UI, Reach UI) thiết kế: dùng `value`/`onValueChange` để cha kiểm soát, hoặc `defaultValue` để component tự lo.
+
+---
+
+## 7. cloneElement: cách cũ và vì sao tránh
+
+Trước khi Context phổ biến, người ta tiêm state cho con bằng `React.cloneElement`:
+
+```tsx
+// ❌ Cách cũ: lặp qua children và clone để tiêm props
+function Tabs({ children }) {
+  const [active, setActive] = useState(0);
+  return Children.map(children, (child, i) =>
+    cloneElement(child, { active: active === i, onSelect: () => setActive(i) })
+  );
+}
+```
+
+> [!WARNING]
+> `cloneElement` chỉ tiêm được vào **con trực tiếp** — nếu user bọc thêm một `<div>` quanh `<Tab>`, props không tới được. Context không bị giới hạn này (con sâu mấy tầng vẫn đọc được). Vì vậy **ưu tiên Context** cho compound components hiện đại.
+
+---
+
+## 8. Ưu / nhược điểm
 
 | Ưu điểm | Nhược điểm |
 |---------|-----------|
@@ -173,8 +228,31 @@ export { Tabs };
 
 ---
 
+## 9. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. Compound components chia sẻ state cho các mảnh con bằng gì?">
+    Bằng Context: cha (Tabs) đặt state vào Provider, các con (Trigger/Panel) đọc qua useContext.
+  </Accordion>
+  <Accordion title="2. Pattern này giải quyết vấn đề gì?">
+    'Prop explosion' — component all-in-one phình ra hàng chục props mà vẫn không đủ linh hoạt. Thay bằng ghép các mảnh con.
+  </Accordion>
+  <Accordion title="3. Vì sao Context tốt hơn cloneElement?">
+    cloneElement chỉ tiêm vào con trực tiếp; nếu user bọc thêm tầng thì props không tới. Context cho con sâu mấy tầng vẫn đọc được.
+  </Accordion>
+  <Accordion title="4. Controlled và uncontrolled khác gì?">
+    Uncontrolled: component tự giữ state (defaultValue). Controlled: cha giữ state và truyền value + onValueChange. Component tốt nên hỗ trợ cả hai.
+  </Accordion>
+  <Accordion title="5. Khi nào KHÔNG nên dùng compound components?">
+    Với component đơn giản dùng một chỗ — props tường minh gọn hơn. Pattern này hợp cho thư viện UI tái dùng cần linh hoạt cao.
+  </Accordion>
+</Accordions>
+
+---
+
 ## Tài liệu tham khảo
 
 - [Composition](/patterns/composition/)
 - [Tối ưu Context](/toi-uu-rerender/context-optimization/)
 - [Provider Pattern](/patterns/provider-pattern/)
+- [Radix UI — Tabs](https://www.radix-ui.com/primitives/docs/components/tabs)

@@ -1,6 +1,6 @@
 ---
 title: "Referential Equality"
-description: "Vì sao object/array/hàm 'phá' mọi tối ưu — so sánh tham chiếu, Object.is, và cách giữ tham chiếu ổn định"
+description: "Vì sao object/array/hàm 'phá' mọi tối ưu — mô hình bộ nhớ, Object.is khác === ở đâu, phá memo, vòng lặp useEffect, bailout state, và bốn cách giữ tham chiếu ổn định"
 ---
 
 # Referential Equality
@@ -9,11 +9,15 @@ description: "Vì sao object/array/hàm 'phá' mọi tối ưu — so sánh tham
 
 - [Tổng quan](#tổng-quan)
 - [1. Giá trị nguyên thủy vs tham chiếu](#1-giá-trị-nguyên-thủy-vs-tham-chiếu)
+  - [1.1 Mô hình bộ nhớ: stack vs heap](#11-mô-hình-bộ-nhớ-stack-vs-heap)
 - [2. React so sánh bằng Object.is](#2-react-so-sánh-bằng-objectis)
+  - [2.1 Object.is khác === ở đâu](#21-objectis-khác--ở-đâu)
 - [3. Vì sao object inline phá memo](#3-vì-sao-object-inline-phá-memo)
 - [4. Bẫy useEffect chạy vô tận](#4-bẫy-useeffect-chạy-vô-tận)
-- [5. Bốn cách giữ tham chiếu ổn định](#5-bốn-cách-giữ-tham-chiếu-ổn-định)
-- [6. Bảng tổng kết](#6-bảng-tổng-kết)
+- [5. Bẫy setState với object "giống hệt"](#5-bẫy-setstate-với-object-giống-hệt)
+- [6. Bốn cách giữ tham chiếu ổn định](#6-bốn-cách-giữ-tham-chiếu-ổn-định)
+- [7. Bảng tổng kết](#7-bảng-tổng-kết)
+- [8. Câu hỏi tự kiểm tra](#8-câu-hỏi-tự-kiểm-tra)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
@@ -47,6 +51,22 @@ x === y;            // true — cùng một địa chỉ
 
 **Phép loại suy:** hai tờ giấy chép cùng một địa chỉ nhà thì nội dung giống nhau, nhưng là **hai tờ giấy khác nhau**. `===` hỏi "có phải cùng **một tờ giấy** không?", không hỏi "nội dung có giống không?".
 
+### 1.1 Mô hình bộ nhớ: stack vs heap
+
+```text
+  STACK (biến)            HEAP (object thật)
+  ┌──────────┐            ┌────────────────┐
+  │ x  ──────┼──────────► │ { a: 1 }  @0x01 │
+  │ y  ──────┼──────────► │ (cùng @0x01)    │
+  │ z  ──────┼───┐        └────────────────┘
+  └──────────┘   │        ┌────────────────┐
+                 └──────► │ { a: 1 }  @0x02 │  ← object KHÁC, dù nội dung giống
+                          └────────────────┘
+```
+
+- Primitive lưu **trực tiếp** giá trị trên stack → so sánh là so giá trị.
+- Object lưu trên heap; biến chỉ giữ **địa chỉ** → so sánh là so địa chỉ. `x` và `y` cùng `@0x01` nên bằng nhau; `z` trỏ `@0x02` nên khác dù nội dung `{a:1}` giống hệt.
+
 ---
 
 ## 2. React so sánh bằng Object.is
@@ -59,6 +79,19 @@ graph TD
     B -->|"primitive cùng giá trị"| C["= nhau → bỏ qua công việc ✅"]
     B -->|"object/array/fn tạo mới"| D["≠ nhau → làm lại công việc ⚠️"]
 ```
+
+### 2.1 Object.is khác === ở đâu
+
+```ts
+NaN === NaN;            // false  (gây bug khi so sánh)
+Object.is(NaN, NaN);    // true   (React coi NaN không đổi → đúng ý hơn)
+
+-0 === 0;               // true
+Object.is(-0, 0);       // false  (phân biệt -0 và +0)
+```
+
+> [!NOTE]
+> React chọn `Object.is` thay vì `===` chính vì hai ca biên này: muốn `NaN` "bằng chính nó" (để bailout state là `NaN`) và muốn phân biệt `-0`/`+0`. Với object/array/hàm, `Object.is` và `===` hành xử **giống nhau** (đều so địa chỉ).
 
 ---
 
@@ -83,6 +116,9 @@ function Parent() {
 ```
 
 `{ color: 'red' }` viết inline được **tạo lại** mỗi lần `Parent` render. Dù nội dung y hệt, `Object.is(styleCũ, styleMới)` = `false`. `memo` kết luận "props đổi" → render `Child`. Toàn bộ công sức bọc `memo` đổ sông đổ bể.
+
+> [!WARNING]
+> Cùng cạm bẫy này áp dụng cho mảng (`items={[1,2,3]}`), hàm (`onClick={() => ...}`), và cả JSX truyền qua prop. Bất cứ thứ gì "viết literal trong JSX" đều tạo tham chiếu mới mỗi render.
 
 ---
 
@@ -125,7 +161,26 @@ useEffect(() => { /* dùng options */ }, [options]);
 
 ---
 
-## 5. Bốn cách giữ tham chiếu ổn định
+## 5. Bẫy setState với object "giống hệt"
+
+Khi `setState` nhận một object **mới** (dù nội dung giống), React vẫn coi state đã đổi → vẫn re-render (không bailout):
+
+```tsx
+const [user, setUser] = useState({ name: 'An' });
+
+// ❌ object mới mỗi lần gọi → luôn re-render dù 'An' không đổi
+setUser({ name: 'An' });
+
+// React bailout khi truyền CÙNG tham chiếu:
+setUser(user); // cùng object cũ → React bỏ qua re-render
+```
+
+> [!TIP]
+> Ngược lại, khi cập nhật state object bạn **phải** tạo object mới (immutability) để React nhận ra thay đổi — mutate tại chỗ (`user.name = 'Bình'; setUser(user)`) sẽ **không** trigger re-render vì cùng tham chiếu. Đây là hai mặt của cùng một quy tắc.
+
+---
+
+## 6. Bốn cách giữ tham chiếu ổn định
 
 <Steps>
   <Step>
@@ -152,7 +207,7 @@ useEffect(() => { /* dùng options */ }, [options]);
 
 ---
 
-## 6. Bảng tổng kết
+## 7. Bảng tổng kết
 
 | Tình huống | Triệu chứng | Cách sửa |
 |------------|-------------|----------|
@@ -166,9 +221,31 @@ useEffect(() => { /* dùng options */ }, [options]);
 
 ---
 
+## 8. Câu hỏi tự kiểm tra
+
+<Accordions type="single">
+  <Accordion title="1. { a: 1 } === { a: 1 } trả về gì? Vì sao?">
+    false. Hai object literal tạo hai địa chỉ heap khác nhau; === so địa chỉ chứ không so nội dung.
+  </Accordion>
+  <Accordion title="2. Object.is khác === ở những ca nào?">
+    Object.is(NaN, NaN) là true (=== là false) và Object.is(-0, 0) là false (=== là true). Với object thì giống nhau.
+  </Accordion>
+  <Accordion title="3. Vì sao style={{color:'red'}} làm memo vô dụng?">
+    Object literal tạo mới mỗi render → tham chiếu khác → memo thấy props đổi → render. Cần useMemo hoặc hằng ngoài component.
+  </Accordion>
+  <Accordion title="4. Object trong deps useEffect có thể gây gì?">
+    Vòng lặp: object mới mỗi render → effect chạy → setState → render → lặp lại. Sửa bằng primitive deps hoặc useMemo.
+  </Accordion>
+  <Accordion title="5. Vì sao mutate state tại chỗ rồi setState lại không re-render?">
+    Vì cùng tham chiếu → Object.is ra true → React bailout. Phải tạo object mới (immutability) để React nhận ra thay đổi.
+  </Accordion>
+</Accordions>
+
+---
+
 ## Tài liệu tham khảo
 
 - [MDN — Object.is](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is)
-- [React Docs — removing object dependencies](https://react.dev/learn/removing-effect-dependencies)
+- [React Docs — Removing Effect Dependencies](https://react.dev/learn/removing-effect-dependencies)
 - [React.memo](/toi-uu-rerender/react-memo/)
 - [useMemo & useCallback](/toi-uu-rerender/usememo-usecallback/)
