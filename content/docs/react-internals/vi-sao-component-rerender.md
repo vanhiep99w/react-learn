@@ -18,8 +18,10 @@ description: "Ba nguyên nhân khiến component render lại, cơ chế snapsho
 - [4. Cập nhật bằng updater function](#4-cập-nhật-bằng-updater-function)
   - [4.1 Hàng đợi update xử lý ra sao](#41-hàng-đợi-update-xử-lý-ra-sao)
 - [5. Cha re-render → con re-render (mặc định)](#5-cha-re-render--con-re-render-mặc-định)
+  - [5.1 Không phải con nào cũng bị render — element reference stability](#51-không-phải-con-nào-cũng-bị-render--element-reference-stability)
 - [6. Context đổi → mọi consumer re-render](#6-context-đổi--mọi-consumer-re-render)
 - [7. Bailout — khi React bỏ qua re-render](#7-bailout--khi-react-bỏ-qua-re-render)
+  - [7.1 Bốn điều kiện bailout (passive rendering)](#71-bốn-điều-kiện-bailout-passive-rendering)
 - [8. Những hiểu lầm thường gặp (FAQ)](#8-những-hiểu-lầm-thường-gặp-faq)
 - [9. Checklist gỡ rối re-render thừa](#9-checklist-gỡ-rối-re-render-thừa)
 - [10. Câu hỏi tự kiểm tra](#10-câu-hỏi-tự-kiểm-tra)
@@ -275,6 +277,48 @@ graph TD
 > [!TIP]
 > Mẹo "children làm slot": nếu truyền component nặng qua prop `children`, nó được tạo ở **component cha cao hơn** và **không** re-render khi state của component giữa thay đổi. Đây là cách tối ưu không cần `memo` — chi tiết ở [Composition](/patterns/composition/).
 
+### 5.1 Không phải con nào cũng bị render — element reference stability
+
+Một insight hay từ [Zhenghao](https://www.zhenghao.io/posts/react-rerender): khi Parent re-render, **không phải mọi con** đều re-render như nhau. Quan trọng là **ai tạo ra ReactElement** đó:
+
+```tsx
+export default function App() {
+  return (
+    <Parent lastChild={<ChildC />}>
+      <ChildB />
+    </Parent>
+  );
+}
+
+function Parent({ children, lastChild }) {
+  const [, forceRender] = useReducer(() => ({}), {});
+  useEffect(() => {
+    const id = setInterval(forceRender, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  console.log('Parent render');
+  return (
+    <div>
+      <ChildA />   {/* ← inline trong Parent */}
+      {children}   {/* ← element tạo ở App */}
+      {lastChild}  {/* ← element tạo ở App */}
+    </div>
+  );
+}
+```
+
+| Component | Re-render khi Parent render? | Vì sao |
+|-----------|------------------------------|--------|
+| `ChildA` | ✅ Có | Element `<ChildA />` viết inline trong `Parent` → mỗi lần render tạo **object mới** → tham chiếu khác → không bailout |
+| `ChildB` | ❌ Không | Element `<ChildB />` được tạo ở `App` (không re-render) → **cùng tham chiếu** qua mọi lần Parent render → bailout |
+| `ChildC` | ❌ Không | Tương tự `ChildB` — element tạo ở `App`, truyền qua prop `lastChild` |
+
+**Cơ chế gốc:** mỗi lần `Parent` render, code `<ChildA />` chạy lại → tạo `{ type: ChildA, props: {} }` **mới** (khác tham chiếu so với lần trước). React so sánh element cũ vs mới bằng `Object.is` → khác → render. Trong khi `children` và `lastChild` là props nhận từ `App` — mà `App` **không** re-render, nên element giữ nguyên tham chiếu → React bailout.
+
+> [!IMPORTANT]
+> Đây chính là lý do kỹ thuật "nâng component lên làm children" (composition) giúp tối ưu mà **không** cần `memo`: element được tạo ở tầng cao hơn (không re-render) nên tham chiếu ổn định tự nhiên. Xem [Composition — performance](/patterns/composition/#5-composition-là-một-tối-ưu-performance).
+
 ---
 
 ## 6. Context đổi → mọi consumer re-render
@@ -321,6 +365,37 @@ setN(0); // n vẫn đang là 0 → React BAILOUT, không re-render các con
 const [user, setUser] = useState({ name: 'An' });
 setUser({ name: 'An' }); // object MỚI dù nội dung giống → KHÔNG bailout → vẫn re-render
 ```
+
+### 7.1 Bốn điều kiện bailout (passive rendering)
+
+Ngoài bailout do "setState cùng giá trị" (proactive), React còn bailout cho component con trong quá trình **passive rendering** (bị cha kéo theo). Bốn điều kiện phải **đồng thời** thoả mãn:
+
+| # | Điều kiện | Ý nghĩa |
+|---|-----------|----------|
+| 1 | Component đã mount | Lần render đầu tiên (mount) không bao giờ bailout |
+| 2 | Props không đổi tham chiếu | `Object.is(propsCũ, propsMới)` cho **từng** prop |
+| 3 | Context không đổi | Không có context nào component đang đọc bị thay đổi |
+| 4 | Không có update nội bộ đang chờ | Component không tự `setState` trong chu kỳ này |
+
+```mermaid
+graph TD
+    P["Cha render → React xét con"] --> Q{"Đã mount?"}
+    Q -->|"Chưa (mount lần đầu)"| R["Render bắt buộc"]
+    Q -->|"Rồi"| S{"Props đổi tham chiếu?"}
+    S -->|"Có"| R
+    S -->|"Không"| T{"Context đổi?"}
+    T -->|"Có"| R
+    T -->|"Không"| U{"Có pending update?"}
+    U -->|"Có"| R
+    U -->|"Không"| V["BAILOUT ✅ — bỏ qua render"]
+```
+
+> [!NOTE]
+> Phân biệt **proactive** vs **passive** rendering giúp hiểu khi nào bailout áp dụng:
+> - **Proactive**: component tự schedule update (setState/useReducer) → bailout chỉ khi giá trị y hệt.
+> - **Passive**: component bị cha kéo theo → bailout nếu thoả 4 điều kiện trên.
+>
+> `React.memo` hoạt động bằng cách **chủ động kiểm tra điều kiện 2** (so sánh props) ngay ở `beginWork`, thay vì để React dùng referential equality mặc định của element. Xem [Fiber — Bailout](/react-internals/fiber-reconciliation/#43-bailout--khi-react-bỏ-qua-cả-subtree).
 
 ---
 
@@ -401,3 +476,5 @@ setUser({ name: 'An' }); // object MỚI dù nội dung giống → KHÔNG bailo
 - [Tổng quan tối ưu re-render](/toi-uu-rerender/tong-quan-toi-uu/)
 - [Referential Equality](/toi-uu-rerender/referential-equality/)
 - [Context Optimization](/toi-uu-rerender/context-optimization/)
+- [Zhenghao — When does React render your component?](https://www.zhenghao.io/posts/react-rerender)
+- [Mark Erikson — A (Mostly) Complete Guide to React Rendering Behavior](https://blog.isquaredsoftware.com/2020/05/blogged-answers-a-mostly-complete-guide-to-react-rendering-behavior/)
