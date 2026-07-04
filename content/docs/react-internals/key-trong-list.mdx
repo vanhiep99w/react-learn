@@ -258,7 +258,7 @@ function Editor({ tabId }: { tabId: string }) {
     Mỗi render sinh key mới → mọi phần tử bị coi là mới → remount toàn bộ, mất state, chậm.
   </Accordion>
   <Accordion title="5. Làm sao reset sạch state của một component khi đổi ngữ cảnh?">
-    Đặt key động lên nó (ví dụ key={userId}). Key đổi → React tạo fiber mới → state reset hoàn toàn.
+    Đặt key động lên nó (ví dụ `key={userId}`). Key đổi → React tạo fiber mới → state reset hoàn toàn.
   </Accordion>
 </Accordions>
 

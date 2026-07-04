@@ -194,7 +194,7 @@ graph LR
     useMemo(() => a + b, [a, b]) đắt hơn là cứ tính a + b. Bản thân useMemo phải lưu giá trị + so sánh deps. Chỉ memo cái thật sự nặng.
   </Accordion>
   <Accordion title="React.memo nhưng vẫn truyền object/hàm inline">
-    <Memoized data={{x:1}} onClick={() => ...} /> — object và hàm tạo mới mỗi render → memo so sánh thấy 'khác' → vô dụng. Phải ổn định props trước (useMemo/useCallback). Xem Referential Equality.
+    `<Memoized data={{x:1}} onClick={() => ...} />` — object và hàm tạo mới mỗi render → memo so sánh thấy 'khác' → vô dụng. Phải ổn định props trước (`useMemo`/`useCallback`). Xem Referential Equality.
   </Accordion>
   <Accordion title="Tối ưu trước khi đo">
     Thêm memoization khắp nơi 'cho chắc' làm tăng độ phức tạp, dễ sinh bug stale closure, và thường không nhanh hơn. Luôn đo bằng Profiler trước.

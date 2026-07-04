@@ -520,10 +520,10 @@ Gõ nhanh liên tục: ô input **không** bị khựng dù danh sách 20.000 ph
     Không. Reconciliation chỉ diff trên cây fiber trong bộ nhớ và gắn flags. Mọi mutation DOM xảy ra ở pha commit. DOM node thật được TẠO ở completeWork (trong bộ nhớ) nhưng GẮN vào trang ở commit.
   </Accordion>
   <Accordion title="Đổi key có khác gì đổi type?">
-    Cả hai đều khiến React coi đó là phần tử khác → unmount cũ, mount mới, reset state. Đổi key là cách CHỦ ĐỘNG để reset state của một component (ví dụ reset form khi đổi user: <key={userId}>). Đổi type thường là TAI NẠN.
+    Cả hai đều khiến React coi đó là phần tử khác → unmount cũ, mount mới, reset state. Đổi key là cách CHỦ ĐỘNG để reset state của một component (ví dụ reset form khi đổi user: `key={userId}`). Đổi type thường là TAI NẠN.
   </Accordion>
   <Accordion title="Vì sao memo của tôi không hoạt động?">
-    Vì bailout dựa trên so sánh props bằng Object.is. Nếu bạn truyền object/array/hàm tạo mới mỗi lần render (ví dụ style={{...}} hay onClick={() => ...}), so sánh luôn ra "khác" → không bailout. Xem bài Referential Equality.
+    Vì bailout dựa trên so sánh props bằng `Object.is`. Nếu bạn truyền object/array/hàm tạo mới mỗi lần render (ví dụ `style={{...}}` hay `onClick={() => ...}`), so sánh luôn ra "khác" → không bailout. Xem bài Referential Equality.
   </Accordion>
   <Accordion title="Concurrent có làm app tự động nhanh hơn?">
     Không tự động. Nó cho phép React ưu tiên và gián đoạn, nhưng bạn phải đánh dấu update nào là "không gấp" (startTransition / useDeferredValue) thì lợi ích mới xuất hiện.
