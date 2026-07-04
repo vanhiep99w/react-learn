@@ -16,7 +16,6 @@
     "next": "^15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "remark-github-admonitions-to-directives": "^2.1.0",
     "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
