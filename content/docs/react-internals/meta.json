@@ -5,6 +5,8 @@
     "fiber-reconciliation",
     "vi-sao-component-rerender",
     "key-trong-list",
-    "strict-mode"
+    "strict-mode",
+    "error-boundaries",
+    "portals"
   ]
 }

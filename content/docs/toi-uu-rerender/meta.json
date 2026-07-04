@@ -6,6 +6,8 @@
     "usememo-usecallback",
     "referential-equality",
     "context-optimization",
-    "code-splitting"
+    "code-splitting",
+    "virtualization",
+    "react-compiler"
   ]
 }
