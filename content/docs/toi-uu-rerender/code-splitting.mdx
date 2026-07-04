@@ -27,8 +27,11 @@ description: "Chia nhỏ bundle bằng React.lazy + Suspense — cơ chế lazy/
 
 Code-splitting là chia bundle JavaScript thành nhiều mảnh (chunk) **tải theo nhu cầu**, thay vì bắt người dùng tải toàn bộ app ngay lần đầu. Đây là tối ưu **thời gian tải** (khác với tối ưu re-render ở các bài trước, vốn là tối ưu **runtime**).
 
-> [!IMPORTANT]
-> Re-render tối ưu CPU lúc chạy; code-splitting tối ưu byte lúc tải. Một app có thể render siêu mượt nhưng vẫn tệ nếu bắt user tải 5MB JS trước khi thấy gì. Hai loại tối ưu này bổ sung cho nhau.
+<Callout type="info" title="Important">
+
+Re-render tối ưu CPU lúc chạy; code-splitting tối ưu byte lúc tải. Một app có thể render siêu mượt nhưng vẫn tệ nếu bắt user tải 5MB JS trước khi thấy gì. Hai loại tối ưu này bổ sung cho nhau.
+
+</Callout>
 
 ---
 
@@ -48,8 +51,11 @@ graph LR
     end
 ```
 
-> [!TIP]
-> Đo bundle trước khi split: với Next.js xem cột "First Load JS" khi `next build`, hoặc dùng `@next/bundle-analyzer`. Với Vite/webpack dùng `rollup-plugin-visualizer`/`webpack-bundle-analyzer`. Tách cái **to và ít dùng** trước.
+<Callout type="info" title="Tip">
+
+Đo bundle trước khi split: với Next.js xem cột "First Load JS" khi `next build`, hoặc dùng `@next/bundle-analyzer`. Với Vite/webpack dùng `rollup-plugin-visualizer`/`webpack-bundle-analyzer`. Tách cái **to và ít dùng** trước.
+
+</Callout>
 
 ---
 
@@ -78,8 +84,11 @@ export default function Dashboard() {
 }
 ```
 
-> [!NOTE]
-> Component truyền cho `lazy` phải là **default export**. Nếu là named export, bọc lại: `lazy(() => import('./m').then(m => ({ default: m.Named })))`.
+<Callout type="info" title="Note">
+
+Component truyền cho `lazy` phải là **default export**. Nếu là named export, bọc lại: `lazy(() => import('./m').then(m => ({ default: m.Named })))`.
+
+</Callout>
 
 ### 2.1 Cơ chế: lazy & Suspense hoạt động thế nào
 
@@ -94,8 +103,11 @@ graph TD
     E --> F["React render lại → Chart hiện thật"]
 ```
 
-> [!NOTE]
-> Đây là cùng cơ chế Suspense dùng cho data fetching: "ném" một Promise để báo "tôi chưa sẵn sàng, hãy hiện fallback". Hiểu điều này giúp bạn dùng Suspense nhất quán cho cả code-splitting lẫn data.
+<Callout type="info" title="Note">
+
+Đây là cùng cơ chế Suspense dùng cho data fetching: "ném" một Promise để báo "tôi chưa sẵn sàng, hãy hiện fallback". Hiểu điều này giúp bạn dùng Suspense nhất quán cho cả code-splitting lẫn data.
+
+</Callout>
 
 ### 2.2 Bắt lỗi tải bằng Error Boundary
 
@@ -109,8 +121,11 @@ Nếu mạng lỗi, `import()` reject → component lazy ném lỗi. `Suspense` 
 </ErrorBoundary>
 ```
 
-> [!WARNING]
-> Thiếu Error Boundary, một lỗi tải chunk (vd user mất mạng giữa chừng, hoặc deploy mới làm chunk cũ 404) sẽ làm sập cả nhánh UI. Luôn ghép Suspense với Error Boundary cho lazy.
+<Callout type="warn" title="Warning">
+
+Thiếu Error Boundary, một lỗi tải chunk (vd user mất mạng giữa chừng, hoặc deploy mới làm chunk cũ 404) sẽ làm sập cả nhánh UI. Luôn ghép Suspense với Error Boundary cho lazy.
+
+</Callout>
 
 ---
 
@@ -139,8 +154,11 @@ export default function App() {
 }
 ```
 
-> [!TIP]
-> Với Next.js (như repo này dùng), code-splitting theo route là **mặc định** — mỗi page tự thành chunk. Bạn chủ yếu cần `next/dynamic` cho component nặng trong một trang.
+<Callout type="info" title="Tip">
+
+Với Next.js (như repo này dùng), code-splitting theo route là **mặc định** — mỗi page tự thành chunk. Bạn chủ yếu cần `next/dynamic` cho component nặng trong một trang.
+
+</Callout>
 
 ---
 
@@ -174,8 +192,11 @@ export default function Page() {
 }
 ```
 
-> [!NOTE]
-> `ssr: false` hữu ích cho thư viện đụng tới `window`/`document` (chỉ có ở trình duyệt). Với component bình thường, để mặc định `ssr: true` để vẫn có HTML từ server.
+<Callout type="info" title="Note">
+
+`ssr: false` hữu ích cho thư viện đụng tới `window`/`document` (chỉ có ở trình duyệt). Với component bình thường, để mặc định `ssr: true` để vẫn có HTML từ server.
+
+</Callout>
 
 ---
 
@@ -199,8 +220,11 @@ function Good() {
 }
 ```
 
-> [!IMPORTANT]
-> Chọn `fallback` có **kích thước gần đúng** với nội dung thật (skeleton) để tránh **layout shift** — màn hình nhảy khi nội dung tải xong. Fallback `null` hoặc spinner nhỏ giữa trang lớn gây giật bố cục.
+<Callout type="info" title="Important">
+
+Chọn `fallback` có **kích thước gần đúng** với nội dung thật (skeleton) để tránh **layout shift** — màn hình nhảy khi nội dung tải xong. Fallback `null` hoặc spinner nhỏ giữa trang lớn gây giật bố cục.
+
+</Callout>
 
 ---
 
@@ -215,8 +239,11 @@ graph LR
     C --> D["hiện"]
 ```
 
-> [!TIP]
-> Tránh waterfall: đặt các ranh giới lazy ở cùng một tầng (song song) thay vì lồng sâu, hoặc preload B ngay khi bắt đầu tải A. Một `Suspense` bao nhiều lazy anh em sẽ tải song song.
+<Callout type="info" title="Tip">
+
+Tránh waterfall: đặt các ranh giới lazy ở cùng một tầng (song song) thay vì lồng sâu, hoặc preload B ngay khi bắt đầu tải A. Một `Suspense` bao nhiều lazy anh em sẽ tải song song.
+
+</Callout>
 
 ---
 
@@ -248,8 +275,11 @@ sequenceDiagram
     B-->>U: hiển thị ngay (chunk đã có sẵn)
 ```
 
-> [!TIP]
-> Cân bằng: preload quá sớm/quá nhiều thì lại tải thừa như khi không split. Preload theo tín hiệu ý định của user (hover, focus, sắp scroll tới) là điểm ngọt.
+<Callout type="info" title="Tip">
+
+Cân bằng: preload quá sớm/quá nhiều thì lại tải thừa như khi không split. Preload theo tín hiệu ý định của user (hover, focus, sắp scroll tới) là điểm ngọt.
+
+</Callout>
 
 ---
 

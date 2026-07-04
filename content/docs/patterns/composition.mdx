@@ -26,8 +26,11 @@ description: "Ghép component qua children & slots thay vì kế thừa — inve
 
 **Composition** (ghép nối) là triết lý cốt lõi của React: xây UI phức tạp bằng cách **lồng các component đơn giản** vào nhau, truyền nội dung qua `children` và props, thay vì kế thừa class hay nhồi mọi thứ vào một component khổng lồ.
 
-> [!IMPORTANT]
-> Gần như mọi "pattern" nâng cao (compound components, render props, provider...) đều là biến thể của composition. Nắm chắc composition, các pattern sau chỉ là áp dụng có chủ đích.
+<Callout type="info" title="Important">
+
+Gần như mọi "pattern" nâng cao (compound components, render props, provider...) đều là biến thể của composition. Nắm chắc composition, các pattern sau chỉ là áp dụng có chủ đích.
+
+</Callout>
 
 ---
 
@@ -53,8 +56,11 @@ const SuccessButton = (props: { children: React.ReactNode }) => (
 );
 ```
 
-> [!NOTE]
-> Tài liệu React chính thức khẳng định: "chúng tôi chưa từng gặp trường hợp nào cần dùng kế thừa component". Bất cứ cái gì kế thừa làm được, composition đều làm được — gọn và linh hoạt hơn.
+<Callout type="info" title="Note">
+
+Tài liệu React chính thức khẳng định: "chúng tôi chưa từng gặp trường hợp nào cần dùng kế thừa component". Bất cứ cái gì kế thừa làm được, composition đều làm được — gọn và linh hoạt hơn.
+
+</Callout>
 
 ### 1.1 Specialization: biến thể bằng cách bọc
 
@@ -97,8 +103,11 @@ function Card({ children }: { children: React.ReactNode }) {
 
 `Card` không cần biết bên trong là gì — nó chỉ lo phần khung. Đây là **đảo ngược điều khiển (inversion of control)**: nơi dùng quyết định nội dung, component quyết định bố cục.
 
-> [!TIP]
-> "Inversion of control" là chìa khóa: thay vì component cứng nhắc tự dựng mọi thứ bên trong, nó **giao quyền** cho nơi gọi quyết định nội dung. Component càng "không biết" về nội dung càng tái dùng được nhiều.
+<Callout type="info" title="Tip">
+
+"Inversion of control" là chìa khóa: thay vì component cứng nhắc tự dựng mọi thứ bên trong, nó **giao quyền** cho nơi gọi quyết định nội dung. Component càng "không biết" về nội dung càng tái dùng được nhiều.
+
+</Callout>
 
 ---
 
@@ -135,8 +144,11 @@ function PageLayout({ header, sidebar, children, footer }: {
 </PageLayout>
 ```
 
-> [!TIP]
-> JSX là giá trị bình thường — truyền được qua bất kỳ prop nào, không chỉ `children`. Dùng tên prop có nghĩa (`header`, `icon`, `actions`) khi có nhiều slot.
+<Callout type="info" title="Tip">
+
+JSX là giá trị bình thường — truyền được qua bất kỳ prop nào, không chỉ `children`. Dùng tên prop có nghĩa (`header`, `icon`, `actions`) khi có nhiều slot.
+
+</Callout>
 
 ### 3.1 children hay slot props?
 
@@ -147,8 +159,11 @@ function PageLayout({ header, sidebar, children, footer }: {
 | Nội dung "nằm trong" về mặt ngữ nghĩa | `children` |
 | Nội dung là "cấu hình bố cục" | slot props |
 
-> [!NOTE]
-> Có thể kết hợp: `children` cho nội dung chính + vài slot props có tên cho các vùng phụ. Đừng nhồi mọi thứ vào `children` rồi tự đoán vị trí.
+<Callout type="info" title="Note">
+
+Có thể kết hợp: `children` cho nội dung chính + vài slot props có tên cho các vùng phụ. Đừng nhồi mọi thứ vào `children` rồi tự đoán vị trí.
+
+</Callout>
 
 ---
 
@@ -167,8 +182,11 @@ function PageLayout({ header, sidebar, children, footer }: {
 // Layout & Header không cần biết tới "user" nữa
 ```
 
-> [!NOTE]
-> Composition không thay thế Context — nó **giảm** nhu cầu Context cho các trường hợp đơn giản. Context dành cho dữ liệu cần ở **rất nhiều nơi rải rác**; composition giải quyết drilling theo một nhánh dọc.
+<Callout type="info" title="Note">
+
+Composition không thay thế Context — nó **giảm** nhu cầu Context cho các trường hợp đơn giản. Context dành cho dữ liệu cần ở **rất nhiều nơi rải rác**; composition giải quyết drilling theo một nhánh dọc.
+
+</Callout>
 
 ---
 
@@ -203,8 +221,11 @@ graph TD
     CB -.->|"children là element CŨ → KHÔNG render lại"| ET["ExpensiveTree giữ nguyên"]
 ```
 
-> [!IMPORTANT]
-> Đây là một trong những kỹ thuật tối ưu **rẻ và sạch** nhất: thay vì `memo`, hãy thử **đẩy phần nặng ra ngoài và nhận lại qua `children`**. Không cần so sánh props, không cần ổn định tham chiếu.
+<Callout type="info" title="Important">
+
+Đây là một trong những kỹ thuật tối ưu **rẻ và sạch** nhất: thay vì `memo`, hãy thử **đẩy phần nặng ra ngoài và nhận lại qua `children`**. Không cần so sánh props, không cần ổn định tham chiếu.
+
+</Callout>
 
 ---
 
@@ -237,8 +258,11 @@ Trước hooks, **Higher-Order Component** (HOC — hàm nhận component, trả
 | Vấn đề | "Wrapper hell", trùng tên prop, khó lần nguồn props | Rõ ràng, dữ liệu đi tường minh |
 | Khi nào còn hợp | Tích hợp lib cũ (vd `connect` của Redux) | Hầu hết trường hợp mới |
 
-> [!TIP]
-> Nếu đang định viết một HOC mới, hãy cân nhắc custom hook (cho logic) + composition (cho UI) trước — gần như luôn gọn hơn và dễ debug hơn.
+<Callout type="info" title="Tip">
+
+Nếu đang định viết một HOC mới, hãy cân nhắc custom hook (cho logic) + composition (cho UI) trước — gần như luôn gọn hơn và dễ debug hơn.
+
+</Callout>
 
 ---
 

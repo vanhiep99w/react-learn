@@ -25,8 +25,11 @@ description: "Đóng gói Context thành Provider + custom hook — API sạch t
 
 **Provider Pattern** là cách đóng gói một Context thành một bộ ba sạch sẽ: một component `Provider` quản lý state, một custom hook `use*` để đọc, và Context được **giấu kín** không export ra ngoài. Đây là cách dùng Context "đúng chuẩn" trong app thật.
 
-> [!IMPORTANT]
-> Pattern này là sự kết hợp của ba thứ đã học: **Context** ([tối ưu context](/toi-uu-rerender/context-optimization/)) + **composition** ([composition](/patterns/composition/)) + **custom hook** ([custom hooks](/patterns/custom-hooks/)). Nó biến Context lộn xộn thành một API gọn như một thư viện.
+<Callout type="info" title="Important">
+
+Pattern này là sự kết hợp của ba thứ đã học: **Context** ([tối ưu context](/toi-uu-rerender/context-optimization/)) + **composition** ([composition](/patterns/composition/)) + **custom hook** ([custom hooks](/patterns/custom-hooks/)). Nó biến Context lộn xộn thành một API gọn như một thư viện.
+
+</Callout>
 
 ---
 
@@ -115,8 +118,11 @@ function Toolbar() {
 }
 ```
 
-> [!TIP]
-> Cái lỗi ném ra trong `useTheme` là "vàng": nếu ai đó vô tình dùng `useTheme` ngoài `<ThemeProvider>`, họ nhận thông báo rõ ràng ngay, thay vì một `Cannot read property of undefined` bí ẩn.
+<Callout type="info" title="Tip">
+
+Cái lỗi ném ra trong `useTheme` là "vàng": nếu ai đó vô tình dùng `useTheme` ngoài `<ThemeProvider>`, họ nhận thông báo rõ ràng ngay, thay vì một `Cannot read property of undefined` bí ẩn.
+
+</Callout>
 
 ---
 
@@ -149,8 +155,11 @@ export function ThemeProvider({
 }
 ```
 
-> [!WARNING]
-> Truy cập `localStorage`/`window` phải bọc kiểm tra `typeof window === 'undefined'` để không vỡ khi render ở server (SSR). Dùng **khởi tạo lười** (`useState(() => ...)`) để chỉ đọc một lần, không phải mỗi render.
+<Callout type="warn" title="Warning">
+
+Truy cập `localStorage`/`window` phải bọc kiểm tra `typeof window === 'undefined'` để không vỡ khi render ở server (SSR). Dùng **khởi tạo lười** (`useState(() => ...)`) để chỉ đọc một lần, không phải mỗi render.
+
+</Callout>
 
 ---
 
@@ -186,8 +195,11 @@ function AppProviders({ children }: { children: ReactNode }) {
 // Dùng: <AppProviders><App /></AppProviders>
 ```
 
-> [!NOTE]
-> Có thể viết helper gộp mảng provider để hết lồng, nhưng cách trên đủ rõ ràng cho hầu hết dự án. Đừng trừu tượng hoá quá mức.
+<Callout type="info" title="Note">
+
+Có thể viết helper gộp mảng provider để hết lồng, nhưng cách trên đủ rõ ràng cho hầu hết dự án. Đừng trừu tượng hoá quá mức.
+
+</Callout>
 
 ---
 
@@ -225,8 +237,11 @@ import { createContext, useContext, useState } from 'react';
 // ... ThemeProvider, useTheme
 ```
 
-> [!IMPORTANT]
-> Server Components **không** dùng được Context (không có state/hook). Đặt Provider ở ranh giới client (vd trong `app/layout.tsx` bọc `{children}`), rồi các Server Component con vẫn render bình thường bên trong nó.
+<Callout type="info" title="Important">
+
+Server Components **không** dùng được Context (không có state/hook). Đặt Provider ở ranh giới client (vd trong `app/layout.tsx` bọc `{children}`), rồi các Server Component con vẫn render bình thường bên trong nó.
+
+</Callout>
 
 ---
 

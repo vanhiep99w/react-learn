@@ -25,8 +25,11 @@ description: "Gom logic state phức tạp vào reducer, và state reducer patte
 
 `useReducer` gom logic cập nhật state vào **một hàm thuần `reducer(state, action) => newState`**, thay vì rải rác nhiều `setState`. **State Reducer Pattern** (do Kent C. Dodds phổ biến) tiến thêm một bước: cho **người dùng component** truyền vào reducer của riêng họ để **can thiệp** cách state thay đổi — đỉnh cao của inversion of control.
 
-> [!IMPORTANT]
-> Phân biệt hai khái niệm cùng tên: **`useReducer`** là một hook quản lý state nội bộ. **State reducer pattern** là một kỹ thuật thiết kế component tái dùng, cho phép bên ngoài ghi đè logic transition. Bài này nói cả hai.
+<Callout type="info" title="Important">
+
+Phân biệt hai khái niệm cùng tên: **`useReducer`** là một hook quản lý state nội bộ. **State reducer pattern** là một kỹ thuật thiết kế component tái dùng, cho phép bên ngoài ghi đè logic transition. Bài này nói cả hai.
+
+</Callout>
 
 ---
 
@@ -87,8 +90,11 @@ graph LR
     RR --> UI
 ```
 
-> [!NOTE]
-> `dispatch` **ổn định** suốt vòng đời component (giống setter của useState) — truyền xuống con hay đưa vào deps đều an toàn, không gây re-render thừa.
+<Callout type="info" title="Note">
+
+`dispatch` **ổn định** suốt vòng đời component (giống setter của useState) — truyền xuống con hay đưa vào deps đều an toàn, không gây re-render thừa.
+
+</Callout>
 
 ### 2.1 Khởi tạo lười với hàm init
 
@@ -106,8 +112,11 @@ function Counter({ initialCount }: { initialCount: number }) {
 }
 ```
 
-> [!TIP]
-> Tách `init` ra ngoài giúp tái dùng cho action `'reset'`: `case 'reset': return init(action.payload);` — vừa khởi tạo vừa reset dùng chung một logic.
+<Callout type="info" title="Tip">
+
+Tách `init` ra ngoài giúp tái dùng cho action `'reset'`: `case 'reset': return init(action.payload);` — vừa khởi tạo vừa reset dùng chung một logic.
+
+</Callout>
 
 ---
 
@@ -161,8 +170,11 @@ const calcTotal = (items: Item[]) => items.reduce((s, i) => s + i.price * i.qty,
 | Test logic | Phải render | ✅ Test reducer thuần, không cần React |
 | Truyền "cách cập nhật" xuống sâu | Truyền nhiều setter | ✅ Chỉ truyền `dispatch` |
 
-> [!TIP]
-> Reducer là **hàm thuần** nên test cực dễ: `expect(reducer(state, action)).toEqual(expected)` — không cần render component, không cần mock. Đây là lý do logic phức tạp nên nằm trong reducer.
+<Callout type="info" title="Tip">
+
+Reducer là **hàm thuần** nên test cực dễ: `expect(reducer(state, action)).toEqual(expected)` — không cần render component, không cần mock. Đây là lý do logic phức tạp nên nằm trong reducer.
+
+</Callout>
 
 ---
 
@@ -227,8 +239,11 @@ graph TD
     D --> E["state mới"]
 ```
 
-> [!IMPORTANT]
-> Sức mạnh của state reducer pattern: component thư viện **không thể** đoán hết mọi nhu cầu tương lai. Thay vì nhồi vô số props (`onBeforeToggle`, `maxToggles`, ...), nó giao cho người dùng **toàn bộ quyết định transition** qua một reducer. Người dùng tái dùng reducer mặc định cho phần họ không quan tâm. Đây là mức inversion of control cao nhất trong các pattern.
+<Callout type="info" title="Important">
+
+Sức mạnh của state reducer pattern: component thư viện **không thể** đoán hết mọi nhu cầu tương lai. Thay vì nhồi vô số props (`onBeforeToggle`, `maxToggles`, ...), nó giao cho người dùng **toàn bộ quyết định transition** qua một reducer. Người dùng tái dùng reducer mặc định cho phần họ không quan tâm. Đây là mức inversion of control cao nhất trong các pattern.
+
+</Callout>
 
 ---
 
@@ -244,8 +259,11 @@ graph TD
 | Selector tối ưu re-render | Không (tự lo qua Context) | Có sẵn |
 | Khi nào | State phức tạp một vùng | State toàn cục lớn, nhiều nơi ghi/đọc |
 
-> [!NOTE]
-> `useReducer` + Context có thể thay Redux cho app vừa và nhỏ. Khi cần middleware, time-travel, hoặc selector tối ưu, hãy dùng Redux Toolkit (hoặc Zustand/Jotai) — xem [Tối ưu Context](/toi-uu-rerender/context-optimization/).
+<Callout type="info" title="Note">
+
+`useReducer` + Context có thể thay Redux cho app vừa và nhỏ. Khi cần middleware, time-travel, hoặc selector tối ưu, hãy dùng Redux Toolkit (hoặc Zustand/Jotai) — xem [Tối ưu Context](/toi-uu-rerender/context-optimization/).
+
+</Callout>
 
 ---
 

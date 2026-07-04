@@ -38,8 +38,11 @@ graph LR
     C --> P["Browser Paint<br/>(vẽ pixel)"]
 ```
 
-> [!IMPORTANT]
-> Từ **"render"** trong React **không** có nghĩa là "vẽ lên màn hình". Render = React **gọi hàm component của bạn** để biết UI nên trông như thế nào. Việc đụng vào DOM thật chỉ xảy ra ở pha **Commit**. Nhầm lẫn hai khái niệm này là gốc rễ của hầu hết hiểu lầm về performance.
+<Callout type="info" title="Important">
+
+Từ **"render"** trong React **không** có nghĩa là "vẽ lên màn hình". Render = React **gọi hàm component của bạn** để biết UI nên trông như thế nào. Việc đụng vào DOM thật chỉ xảy ra ở pha **Commit**. Nhầm lẫn hai khái niệm này là gốc rễ của hầu hết hiểu lầm về performance.
+
+</Callout>
 
 **Phép loại suy đời thường:** hãy tưởng tượng bạn là kiến trúc sư.
 
@@ -52,8 +55,11 @@ graph LR
 
 Vẽ lại bản thiết kế (render) rất rẻ. Đập tường xây lại (commit/DOM) mới đắt. React cố tình render nhiều, nhưng commit ít nhất có thể.
 
-> [!NOTE]
-> Bài này mô tả pipeline ở **mức khái niệm**. Bên trong pha Render, React dùng kiến trúc **Fiber** để chia nhỏ và gián đoạn công việc — chi tiết ở [Fiber & Reconciliation](/react-internals/fiber-reconciliation/).
+<Callout type="info" title="Note">
+
+Bài này mô tả pipeline ở **mức khái niệm**. Bên trong pha Render, React dùng kiến trúc **Fiber** để chia nhỏ và gián đoạn công việc — chi tiết ở [Fiber & Reconciliation](/react-internals/fiber-reconciliation/).
+
+</Callout>
 
 ---
 
@@ -81,13 +87,19 @@ function Counter() {
 }
 ```
 
-> [!TIP]
-> Ba nguyên nhân re-render (state / cha / context) được mổ xẻ riêng ở [Vì sao component re-render](/react-internals/vi-sao-component-rerender/). Ở đây chỉ cần nhớ: trigger luôn quy về "có một update được xếp lịch".
+<Callout type="info" title="Tip">
+
+Ba nguyên nhân re-render (state / cha / context) được mổ xẻ riêng ở [Vì sao component re-render](/react-internals/vi-sao-component-rerender/). Ở đây chỉ cần nhớ: trigger luôn quy về "có một update được xếp lịch".
+
+</Callout>
 
 ### 1.1 setState là "xếp lịch", không phải "làm ngay"
 
-> [!NOTE]
-> `setState` không cập nhật biến ngay lập tức và cũng không render đồng bộ ngay tại dòng đó. Nó **xếp lịch (schedule)** một re-render qua scheduler nội bộ của React. Nhiều `setState` trong cùng một sự kiện sẽ được gộp lại — gọi là **batching** — và chỉ render một lần. Chi tiết ở bài [Vì sao component re-render](/react-internals/vi-sao-component-rerender/).
+<Callout type="info" title="Note">
+
+`setState` không cập nhật biến ngay lập tức và cũng không render đồng bộ ngay tại dòng đó. Nó **xếp lịch (schedule)** một re-render qua scheduler nội bộ của React. Nhiều `setState` trong cùng một sự kiện sẽ được gộp lại — gọi là **batching** — và chỉ render một lần. Chi tiết ở bài [Vì sao component re-render](/react-internals/vi-sao-component-rerender/).
+
+</Callout>
 
 ```tsx
 function handleClick() {
@@ -133,8 +145,11 @@ React so cây element mới với cây fiber hiện có để quyết định fi
 
 Đây là điểm khiến nhiều người hiểu sai performance:
 
-> [!WARNING]
-> Một component **re-render** (hàm bị gọi lại) **không** đồng nghĩa với việc DOM bị thay đổi. Nếu cây element mới giống hệt cây cũ, pha Commit sẽ **không** đụng vào DOM nào cả. Re-render thừa làm tốn CPU (chạy lại hàm + so sánh), nhưng không nhất thiết làm "nhấp nháy" màn hình.
+<Callout type="warn" title="Warning">
+
+Một component **re-render** (hàm bị gọi lại) **không** đồng nghĩa với việc DOM bị thay đổi. Nếu cây element mới giống hệt cây cũ, pha Commit sẽ **không** đụng vào DOM nào cả. Re-render thừa làm tốn CPU (chạy lại hàm + so sánh), nhưng không nhất thiết làm "nhấp nháy" màn hình.
+
+</Callout>
 
 ### 2.3 Render phải là hàm thuần
 
@@ -158,8 +173,11 @@ function Good() {
 }
 ```
 
-> [!IMPORTANT]
-> Vì sao React khắt khe? Vì React có thể **render rồi bỏ đi** (trong Concurrent Mode, render có thể bị tạm dừng, hủy, hoặc chạy hai lần ở Strict Mode để bắt bug). Nếu render có side effect, các side effect đó sẽ chạy lung tung hoặc lặp lại. Hàm thuần cho phép React tự do lên lịch lại công việc.
+<Callout type="info" title="Important">
+
+Vì sao React khắt khe? Vì React có thể **render rồi bỏ đi** (trong Concurrent Mode, render có thể bị tạm dừng, hủy, hoặc chạy hai lần ở Strict Mode để bắt bug). Nếu render có side effect, các side effect đó sẽ chạy lung tung hoặc lặp lại. Hàm thuần cho phép React tự do lên lịch lại công việc.
+
+</Callout>
 
 ---
 
@@ -188,8 +206,11 @@ Commit không phải một bước đơn — React chia nó thành **3 pha con**
 
 Sau pha Layout, React trả quyền cho trình duyệt để **paint**. `useEffect` (passive effect) được chạy **sau** paint, ở một lượt riêng.
 
-> [!NOTE]
-> `ref` được gán giá trị DOM node **ở pha Layout** (trong commit, trước paint). Vì vậy đọc `ref.current` trong `useLayoutEffect` luôn thấy DOM mới nhất; đọc trong thân render thì chưa chắc.
+<Callout type="info" title="Note">
+
+`ref` được gán giá trị DOM node **ở pha Layout** (trong commit, trước paint). Vì vậy đọc `ref.current` trong `useLayoutEffect` luôn thấy DOM mới nhất; đọc trong thân render thì chưa chắc.
+
+</Callout>
 
 ### 3.2 useEffect vs useLayoutEffect — thời điểm chạy
 
@@ -198,8 +219,11 @@ Sau pha Layout, React trả quyền cho trình duyệt để **paint**. `useEffe
 | `useLayoutEffect` | **Trong** commit, **trước** khi browser paint (đồng bộ) | Đo kích thước DOM, sửa layout trước khi user thấy (tránh nhấp nháy) |
 | `useEffect` | **Sau** khi browser paint (bất đồng bộ) | Fetch data, subscribe, log, đa số trường hợp |
 
-> [!TIP]
-> Mặc định luôn dùng `useEffect`. Chỉ chuyển sang `useLayoutEffect` khi bạn **đọc kích thước/vị trí DOM rồi đồng bộ sửa lại** và thấy màn hình bị giật một frame. `useLayoutEffect` chặn paint nên lạm dụng sẽ làm chậm cảm giác.
+<Callout type="info" title="Tip">
+
+Mặc định luôn dùng `useEffect`. Chỉ chuyển sang `useLayoutEffect` khi bạn **đọc kích thước/vị trí DOM rồi đồng bộ sửa lại** và thấy màn hình bị giật một frame. `useLayoutEffect` chặn paint nên lạm dụng sẽ làm chậm cảm giác.
+
+</Callout>
 
 ---
 
@@ -301,8 +325,11 @@ createRoot(el).render(
 );
 ```
 
-> [!IMPORTANT]
-> Nếu một component "chạy hai lần" gây lỗi (vd gọi API hai lần, tăng biến đếm hai lần), đó là **dấu hiệu** code chưa thuần hoặc effect thiếu cleanup — hãy sửa gốc, đừng tắt Strict Mode.
+<Callout type="info" title="Important">
+
+Nếu một component "chạy hai lần" gây lỗi (vd gọi API hai lần, tăng biến đếm hai lần), đó là **dấu hiệu** code chưa thuần hoặc effect thiếu cleanup — hãy sửa gốc, đừng tắt Strict Mode.
+
+</Callout>
 
 ---
 

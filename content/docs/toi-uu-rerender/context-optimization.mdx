@@ -24,8 +24,11 @@ description: "Vì sao Context đổi giá trị làm cả cây re-render — cơ
 
 Context giải quyết "prop drilling" (truyền props qua nhiều tầng), nhưng nếu dùng sai sẽ biến thành nguồn re-render khổng lồ: **mọi** component đọc context sẽ render lại khi context value đổi — bất kể nó chỉ quan tâm một phần nhỏ.
 
-> [!IMPORTANT]
-> Khác với props (chỉ ảnh hưởng cây con của cha render), Context value đổi sẽ làm **tất cả consumer** (`useContext`) render lại, dù chúng nằm rải rác. `React.memo` ở giữa **không** chặn được điều này — consumer đăng ký trực tiếp với Provider, "nhảy cóc" qua các tầng memo.
+<Callout type="info" title="Important">
+
+Khác với props (chỉ ảnh hưởng cây con của cha render), Context value đổi sẽ làm **tất cả consumer** (`useContext`) render lại, dù chúng nằm rải rác. `React.memo` ở giữa **không** chặn được điều này — consumer đăng ký trực tiếp với Provider, "nhảy cóc" qua các tầng memo.
+
+</Callout>
 
 ---
 
@@ -59,8 +62,11 @@ function Leaf() {
 }
 ```
 
-> [!NOTE]
-> Đây là điểm khác biệt cốt lõi giữa "re-render do cha" (memo chặn được) và "re-render do context" (memo bó tay). Cách duy nhất để giảm là **đừng để value đổi** hoặc **thu nhỏ phạm vi context**.
+<Callout type="info" title="Note">
+
+Đây là điểm khác biệt cốt lõi giữa "re-render do cha" (memo chặn được) và "re-render do context" (memo bó tay). Cách duy nhất để giảm là **đừng để value đổi** hoặc **thu nhỏ phạm vi context**.
+
+</Callout>
 
 ---
 
@@ -94,8 +100,11 @@ function AuthProvider({ children }) {
 }
 ```
 
-> [!NOTE]
-> `setUser` từ `useState` vốn đã ổn định (React đảm bảo cùng tham chiếu suốt vòng đời), nên chỉ cần `user` trong deps. Đây là ví dụ trực tiếp của [Referential Equality](/toi-uu-rerender/referential-equality/).
+<Callout type="info" title="Note">
+
+`setUser` từ `useState` vốn đã ổn định (React đảm bảo cùng tham chiếu suốt vòng đời), nên chỉ cần `user` trong deps. Đây là ví dụ trực tiếp của [Referential Equality](/toi-uu-rerender/referential-equality/).
+
+</Callout>
 
 ---
 
@@ -109,8 +118,11 @@ const AppContext = createContext({ theme, user, mousePos, cart, notifications })
 // mousePos đổi liên tục → mọi consumer (kể cả chỉ đọc theme) render điên cuồng
 ```
 
-> [!WARNING]
-> Quy tắc: **một context cho một mối quan tâm**, và nhóm theo **tần suất thay đổi**. Tách thứ đổi nhiều ra khỏi thứ đổi ít.
+<Callout type="warn" title="Warning">
+
+Quy tắc: **một context cho một mối quan tâm**, và nhóm theo **tần suất thay đổi**. Tách thứ đổi nhiều ra khỏi thứ đổi ít.
+
+</Callout>
 
 ---
 
@@ -149,8 +161,11 @@ graph TD
     S -.->|"KHÔNG ảnh hưởng"| B["Consumer của DispatchContext (dispatch ổn định)"]
 ```
 
-> [!TIP]
-> `dispatch` từ `useReducer` (và `setState` từ `useState`) được React đảm bảo **ổn định** suốt vòng đời component — nên đặt chúng vào một context riêng là cách "miễn phí" để cắt re-render cho nhánh chỉ-ghi.
+<Callout type="info" title="Tip">
+
+`dispatch` từ `useReducer` (và `setState` từ `useState`) được React đảm bảo **ổn định** suốt vòng đời component — nên đặt chúng vào một context riêng là cách "miễn phí" để cắt re-render cho nhánh chỉ-ghi.
+
+</Callout>
 
 ---
 
@@ -194,8 +209,11 @@ function ThemeLabel() {
 }
 ```
 
-> [!TIP]
-> Nếu cần selector thực sự (subscribe một mẩu của object lớn) mà không tự viết, dùng thư viện như Zustand/Jotai/Redux Toolkit — chúng cài sẵn cơ chế selector trên nền `useSyncExternalStore`.
+<Callout type="info" title="Tip">
+
+Nếu cần selector thực sự (subscribe một mẩu của object lớn) mà không tự viết, dùng thư viện như Zustand/Jotai/Redux Toolkit — chúng cài sẵn cơ chế selector trên nền `useSyncExternalStore`.
+
+</Callout>
 
 ---
 
@@ -208,8 +226,11 @@ function ThemeLabel() {
 | State lớn, đổi nhiều, cần selector | Zustand / Jotai / Redux Toolkit |
 | Server state (data từ API) | TanStack Query / SWR (không nên nhét vào Context) |
 
-> [!IMPORTANT]
-> Đừng dùng Context như một "store toàn cục cho mọi thứ". Context giỏi truyền **giá trị ít đổi** xuống sâu. Với state đổi liên tục và cần tối ưu chi tiết, một thư viện chuyên dụng (có selector) sẽ đỡ đau đầu hơn nhiều.
+<Callout type="info" title="Important">
+
+Đừng dùng Context như một "store toàn cục cho mọi thứ". Context giỏi truyền **giá trị ít đổi** xuống sâu. Với state đổi liên tục và cần tối ưu chi tiết, một thư viện chuyên dụng (có selector) sẽ đỡ đau đầu hơn nhiều.
+
+</Callout>
 
 ---
 

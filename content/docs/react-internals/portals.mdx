@@ -49,8 +49,11 @@ graph TD
     Modal -.createPortal.-> portalRoot
 ```
 
-> [!IMPORTANT]
-> Đây là điểm khiến portal "kỳ diệu" và cũng hay gây bối rối: node DOM của con **nhảy ra chỗ khác** (thường là `document.body`), **nhưng** về mặt React, con **vẫn nằm nguyên trong cây** — nên **event bubbling, context, state đều hoạt động như thể nó chưa đi đâu cả**. Portal chỉ đổi *nơi DOM được gắn*, không đổi *quan hệ cha-con trong React*.
+<Callout type="info" title="Important">
+
+Đây là điểm khiến portal "kỳ diệu" và cũng hay gây bối rối: node DOM của con **nhảy ra chỗ khác** (thường là `document.body`), **nhưng** về mặt React, con **vẫn nằm nguyên trong cây** — nên **event bubbling, context, state đều hoạt động như thể nó chưa đi đâu cả**. Portal chỉ đổi *nơi DOM được gắn*, không đổi *quan hệ cha-con trong React*.
+
+</Callout>
 
 Để hiểu sâu bài này, nên nắm khái niệm cây fiber ở [Fiber & Reconciliation](/react-internals/fiber-reconciliation/).
 
@@ -95,8 +98,11 @@ function Tooltip({ children }) {
 }
 ```
 
-> [!WARNING]
-> `domNode` phải **đã tồn tại** khi render. Nếu tạo `#portal-root` động, đảm bảo nó có mặt trước khi portal render (thường đặt sẵn trong `index.html`, hoặc tạo trong `useEffect` + chỉ render portal sau khi mounted — xem mục 7).
+<Callout type="warn" title="Warning">
+
+`domNode` phải **đã tồn tại** khi render. Nếu tạo `#portal-root` động, đảm bảo nó có mặt trước khi portal render (thường đặt sẵn trong `index.html`, hoặc tạo trong `useEffect` + chỉ render portal sau khi mounted — xem mục 7).
+
+</Callout>
 
 ---
 
@@ -135,8 +141,11 @@ graph TD
     Bubble --> Parent["onClick của div cha bắt được ✅"]
 ```
 
-> [!IMPORTANT]
-> Bubbling theo cây React là **tính năng**, không phải bug — nó khiến portal "trong suốt" với logic của bạn. Nhưng cũng là **bẫy**: nếu bạn có handler "click ra ngoài để đóng modal" gắn ở cha, click **bên trong** modal (portal) vẫn bubble lên cha → có thể đóng modal ngoài ý muốn. Xử lý bằng `e.stopPropagation()` hoặc kiểm tra `event.target`.
+<Callout type="info" title="Important">
+
+Bubbling theo cây React là **tính năng**, không phải bug — nó khiến portal "trong suốt" với logic của bạn. Nhưng cũng là **bẫy**: nếu bạn có handler "click ra ngoài để đóng modal" gắn ở cha, click **bên trong** modal (portal) vẫn bubble lên cha → có thể đóng modal ngoài ý muốn. Xử lý bằng `e.stopPropagation()` hoặc kiểm tra `event.target`.
+
+</Callout>
 
 ### 3.2 Context xuyên qua portal
 
@@ -166,8 +175,11 @@ graph TD
     M -.commit: gắn DOM vào.-> PR["#portal-root trong body"]
 ```
 
-> [!NOTE]
-> Vì portal chỉ là một fiber trong cùng cây, mọi cơ chế đã học vẫn áp dụng: reconciliation, bailout, effect chạy đúng thứ tự, unmount dọn dẹp. React tự tháo node khỏi `domNode` khi portal unmount — bạn **không** cần tự xóa DOM.
+<Callout type="info" title="Note">
+
+Vì portal chỉ là một fiber trong cùng cây, mọi cơ chế đã học vẫn áp dụng: reconciliation, bailout, effect chạy đúng thứ tự, unmount dọn dẹp. React tự tháo node khỏi `domNode` khi portal unmount — bạn **không** cần tự xóa DOM.
+
+</Callout>
 
 ---
 
@@ -353,8 +365,11 @@ function App() {
 
 Về DOM, các node được chèn vào cùng container theo thứ tự commit/placement mà React quyết định từ cây hiện tại. Trong thực tế overlay, thứ tự DOM chỉ là một phần câu chuyện; **z-index, stacking context và thứ tự mount** đều ảnh hưởng cái nào nằm trên.
 
-> [!TIP]
-> Với app nhiều overlay, nên có một `OverlayProvider`/`PortalManager` tập trung để cấp `z-index`, thứ tự layer (`tooltip < popover < modal < toast`) và chính sách focus. Đừng để mỗi component tự chọn `z-index: 999999`.
+<Callout type="info" title="Tip">
+
+Với app nhiều overlay, nên có một `OverlayProvider`/`PortalManager` tập trung để cấp `z-index`, thứ tự layer (`tooltip < popover < modal < toast`) và chính sách focus. Đừng để mỗi component tự chọn `z-index: 999999`.
+
+</Callout>
 
 ---
 
@@ -411,8 +426,11 @@ startTransition(() => {
 - Commit phase vẫn nguyên tử: khi React quyết định commit, DOM portal được chèn/gỡ nhất quán.
 - Context và event không cần xử lý đặc biệt trong transition.
 
-> [!NOTE]
-> Nếu bạn cần một lịch ưu tiên hoàn toàn độc lập, đó là câu chuyện **nhiều React root** (`createRoot` khác), không phải portal. Portal giữ subtree trong cùng root logic.
+<Callout type="info" title="Note">
+
+Nếu bạn cần một lịch ưu tiên hoàn toàn độc lập, đó là câu chuyện **nhiều React root** (`createRoot` khác), không phải portal. Portal giữ subtree trong cùng root logic.
+
+</Callout>
 
 ---
 
@@ -564,8 +582,11 @@ Portal giải quyết vấn đề CSS nhưng **không tự lo a11y** — bạn p
   </Step>
 </Steps>
 
-> [!TIP]
-> Đừng tự viết lại focus trap nếu có thể — các thư viện headless như Radix UI, Headless UI, React Aria đã xử lý đúng a11y (focus trap, `aria-*`, cuộn nền) bên trên portal. Chỉ tự viết khi cần kiểm soát tuyệt đối.
+<Callout type="info" title="Tip">
+
+Đừng tự viết lại focus trap nếu có thể — các thư viện headless như Radix UI, Headless UI, React Aria đã xử lý đúng a11y (focus trap, `aria-*`, cuộn nền) bên trên portal. Chỉ tự viết khi cần kiểm soát tuyệt đối.
+
+</Callout>
 
 ---
 
@@ -584,8 +605,11 @@ function ClientPortal({ children }: { children: React.ReactNode }) {
 }
 ```
 
-> [!WARNING]
-> Trong Next.js (SSR/SSG), luôn bảo vệ portal bằng cờ `mounted` như trên, hoặc dùng `dynamic(() => ..., { ssr: false })`. Truy cập `document`/`window` trong thân render sẽ vỡ ở bước build/SSR. Xem thêm cơ chế hydration ở [Render Pipeline](/react-internals/render-pipeline/).
+<Callout type="warn" title="Warning">
+
+Trong Next.js (SSR/SSG), luôn bảo vệ portal bằng cờ `mounted` như trên, hoặc dùng `dynamic(() => ..., { ssr: false })`. Truy cập `document`/`window` trong thân render sẽ vỡ ở bước build/SSR. Xem thêm cơ chế hydration ở [Render Pipeline](/react-internals/render-pipeline/).
+
+</Callout>
 
 ---
 
@@ -599,8 +623,11 @@ function ClientPortal({ children }: { children: React.ReactNode }) {
 | Toast / Notification | ✅ | Gom về một `#toast-root` cố định |
 | Layout / nội dung thường | ❌ | Không có lý do tách khỏi DOM cha; portal làm phức tạp thừa |
 
-> [!IMPORTANT]
-> Chỉ dùng portal cho UI **nổi/overlay** cần thoát ràng buộc CSS của cha. Đừng dùng portal cho layout thông thường — nó khiến DOM khó suy luận và tăng độ phức tạp không cần thiết.
+<Callout type="info" title="Important">
+
+Chỉ dùng portal cho UI **nổi/overlay** cần thoát ràng buộc CSS của cha. Đừng dùng portal cho layout thông thường — nó khiến DOM khó suy luận và tăng độ phức tạp không cần thiết.
+
+</Callout>
 
 ---
 

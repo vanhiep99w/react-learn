@@ -25,8 +25,11 @@ description: "memo bỏ qua re-render khi props không đổi — cơ chế bail
 
 `React.memo` bọc một component để React **bỏ qua re-render** nếu props của nó **không thay đổi** (so sánh nông). Nó cắt đứt chuỗi "cha render → con render" với điều kiện props giữ nguyên tham chiếu.
 
-> [!IMPORTANT]
-> `memo` chỉ chặn re-render đến từ **cha**. Nó **không** chặn re-render do **state nội bộ** hay **context** của chính component đổi. Và nó chỉ hữu ích khi bạn **thật sự giữ được props ổn định** — điều mà object/hàm inline phá vỡ ngay (mục 3).
+<Callout type="info" title="Important">
+
+`memo` chỉ chặn re-render đến từ **cha**. Nó **không** chặn re-render do **state nội bộ** hay **context** của chính component đổi. Và nó chỉ hữu ích khi bạn **thật sự giữ được props ổn định** — điều mà object/hàm inline phá vỡ ngay (mục 3).
+
+</Callout>
 
 ---
 
@@ -53,8 +56,11 @@ shallowEqual({ a: 1, list: [1] }, { a: 1, list: [1] }); // false — 2 mảng kh
 
 `memo` không phải phép màu riêng — nó tận dụng cơ chế **bailout** sẵn có trong `beginWork` (xem [Fiber](/react-internals/fiber-reconciliation/#43-bailout--khi-react-bỏ-qua-cả-subtree)). Bình thường React vẫn bailout khi một component không có update riêng **và** cha truyền **cùng element**. Nhưng khi cha re-render, element con là **mới** mỗi lần, nên bailout mặc định không kích hoạt. `memo` chèn bước so sánh props để **chủ động** kích hoạt bailout dù element là mới.
 
-> [!NOTE]
-> Hiểu điều này giải thích vì sao `memo` "thua" khi props đổi tham chiếu: bước so sánh props ra "khác" → không bailout → render như thường.
+<Callout type="info" title="Note">
+
+Hiểu điều này giải thích vì sao `memo` "thua" khi props đổi tham chiếu: bước so sánh props ra "khác" → không bailout → render như thường.
+
+</Callout>
 
 ---
 
@@ -130,8 +136,11 @@ export default function App() {
 }
 ```
 
-> [!WARNING]
-> `memo` và `useMemo`/`useCallback` thường phải đi **thành bộ ba**. Bọc `memo` mà quên ổn định props object/hàm = tốn chi phí so sánh mà chẳng chặn được gì. Đọc kỹ [Referential Equality](/toi-uu-rerender/referential-equality/).
+<Callout type="warn" title="Warning">
+
+`memo` và `useMemo`/`useCallback` thường phải đi **thành bộ ba**. Bọc `memo` mà quên ổn định props object/hàm = tốn chi phí so sánh mà chẳng chặn được gì. Đọc kỹ [Referential Equality](/toi-uu-rerender/referential-equality/).
+
+</Callout>
 
 ---
 
@@ -150,8 +159,11 @@ const Panel = memo(function Panel() {
 });
 ```
 
-> [!IMPORTANT]
-> Nhớ ba nguyên nhân re-render: state / cha / context. `memo` chỉ xử lý nhánh **cha**. Đừng kỳ vọng `memo` "đóng băng" một component đang có state riêng hoặc đang nghe context.
+<Callout type="info" title="Important">
+
+Nhớ ba nguyên nhân re-render: state / cha / context. `memo` chỉ xử lý nhánh **cha**. Đừng kỳ vọng `memo` "đóng băng" một component đang có state riêng hoặc đang nghe context.
+
+</Callout>
 
 ---
 
@@ -169,11 +181,17 @@ const Row = memo(
 );
 ```
 
-> [!CAUTION]
-> Cẩn thận: hàm so sánh sai (vd quên một field) gây bug "UI không cập nhật". Và so sánh sâu thủ công có thể đắt hơn chính việc render. Chỉ dùng khi đo thấy đáng. Đa số trường hợp nên ổn định props thay vì viết comparator.
+<Callout type="error" title="Caution">
 
-> [!NOTE]
-> Quy ước trả về **ngược** với `shouldComponentUpdate` của class: comparator của `memo` trả `true` = "bằng nhau, bỏ render"; còn `shouldComponentUpdate` trả `true` = "render". Dễ nhầm.
+Cẩn thận: hàm so sánh sai (vd quên một field) gây bug "UI không cập nhật". Và so sánh sâu thủ công có thể đắt hơn chính việc render. Chỉ dùng khi đo thấy đáng. Đa số trường hợp nên ổn định props thay vì viết comparator.
+
+</Callout>
+
+<Callout type="info" title="Note">
+
+Quy ước trả về **ngược** với `shouldComponentUpdate` của class: comparator của `memo` trả `true` = "bằng nhau, bỏ render"; còn `shouldComponentUpdate` trả `true` = "render". Dễ nhầm.
+
+</Callout>
 
 ---
 
@@ -222,8 +240,11 @@ export default function App() {
 }
 ```
 
-> [!TIP]
-> Kỹ thuật "lift content lên, nhận qua children" giải quyết rất nhiều trường hợp mà không cần `memo` lẫn ổn định props. Đây là một dạng **composition** — xem bài [Composition](/patterns/composition/).
+<Callout type="info" title="Tip">
+
+Kỹ thuật "lift content lên, nhận qua children" giải quyết rất nhiều trường hợp mà không cần `memo` lẫn ổn định props. Đây là một dạng **composition** — xem bài [Composition](/patterns/composition/).
+
+</Callout>
 
 ---
 

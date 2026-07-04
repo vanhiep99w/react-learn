@@ -26,8 +26,11 @@ description: "Tư duy tối ưu đúng: đo trước khi sửa bằng Profiler, 
 
 Chương này dạy bạn **khi nào** và **bằng cách nào** giảm công việc thừa của React. Nhưng bài học quan trọng nhất lại là: **đa số trường hợp bạn không nên tối ưu gì cả.**
 
-> [!IMPORTANT]
-> Re-render không phải là kẻ thù. Render là gọi một hàm JS — thường &lt;1ms. Kẻ thù thật sự là (a) **tính toán nặng** chạy lại mỗi render, và (b) **DOM thay đổi** không cần thiết. Tối ưu mù quáng (bọc `memo`/`useMemo` khắp nơi) làm code khó đọc và đôi khi **chậm hơn** vì bản thân việc so sánh cũng tốn chi phí.
+<Callout type="info" title="Important">
+
+Re-render không phải là kẻ thù. Render là gọi một hàm JS — thường &lt;1ms. Kẻ thù thật sự là (a) **tính toán nặng** chạy lại mỗi render, và (b) **DOM thay đổi** không cần thiết. Tối ưu mù quáng (bọc `memo`/`useMemo` khắp nơi) làm code khó đọc và đôi khi **chậm hơn** vì bản thân việc so sánh cũng tốn chi phí.
+
+</Callout>
 
 Để hiểu vì sao render thường rẻ, cần nắm [Render Pipeline](/react-internals/render-pipeline/) (render ≠ commit) và [Vì sao component re-render](/react-internals/vi-sao-component-rerender/).
 
@@ -52,8 +55,11 @@ Chương này dạy bạn **khi nào** và **bằng cách nào** giảm công vi
   </Step>
 </Steps>
 
-> [!TIP]
-> Quy tắc thực dụng: nếu một lần commit dưới ~16ms (60fps) và app cảm thấy mượt, **đừng đụng vào**. Tối ưu là nợ kỹ thuật — chỉ vay khi cần.
+<Callout type="info" title="Tip">
+
+Quy tắc thực dụng: nếu một lần commit dưới ~16ms (60fps) và app cảm thấy mượt, **đừng đụng vào**. Tối ưu là nợ kỹ thuật — chỉ vay khi cần.
+
+</Callout>
 
 ### 1.1 Đọc flame graph & "Why did this render?"
 
@@ -66,8 +72,11 @@ Trong tab Profiler, mỗi commit là một thanh. Bấm vào một commit để 
 | Mục **"Why did this render?"** | Lý do: "Props changed", "Hooks changed", "Parent rendered"... |
 | Số lần render cao bất thường | Có thể do props đổi tham chiếu mỗi lần (xem Referential Equality) |
 
-> [!NOTE]
-> Bật "Why did this render?" trong Profiler settings (Record why each component rendered). Đây là cách nhanh nhất để biết một re-render đến từ state, props, hay parent — đúng 3 nguyên nhân ở bài [Vì sao component re-render](/react-internals/vi-sao-component-rerender/).
+<Callout type="info" title="Note">
+
+Bật "Why did this render?" trong Profiler settings (Record why each component rendered). Đây là cách nhanh nhất để biết một re-render đến từ state, props, hay parent — đúng 3 nguyên nhân ở bài [Vì sao component re-render](/react-internals/vi-sao-component-rerender/).
+
+</Callout>
 
 ### 1.2 Đo chi phí một phép tính
 
@@ -82,8 +91,11 @@ function Dashboard({ rows }: { rows: Row[] }) {
 }
 ```
 
-> [!TIP]
-> Nếu `console.timeEnd` báo dưới ~1ms, đừng `useMemo` — chi phí lưu + so sánh deps còn lớn hơn lợi ích. Chỉ memo khi phép tính tốn nhiều ms và chạy lại thường xuyên.
+<Callout type="info" title="Tip">
+
+Nếu `console.timeEnd` báo dưới ~1ms, đừng `useMemo` — chi phí lưu + so sánh deps còn lớn hơn lợi ích. Chỉ memo khi phép tính tốn nhiều ms và chạy lại thường xuyên.
+
+</Callout>
 
 ---
 
@@ -110,8 +122,11 @@ function Dashboard({ rows }: { rows: Row[] }) {
 }
 ```
 
-> [!WARNING]
-> Hai vấn đề cần hai công cụ khác nhau: **render lại quá nhiều lần** → `React.memo` / composition; **một lần render quá đắt** → `useMemo`. Dùng nhầm công cụ (vd `memo` cho vấn đề tính toán) sẽ không giúp gì.
+<Callout type="warn" title="Warning">
+
+Hai vấn đề cần hai công cụ khác nhau: **render lại quá nhiều lần** → `React.memo` / composition; **một lần render quá đắt** → `useMemo`. Dùng nhầm công cụ (vd `memo` cho vấn đề tính toán) sẽ không giúp gì.
+
+</Callout>
 
 ---
 
@@ -149,8 +164,11 @@ Khi Profiler chỉ ra vấn đề, hãy thử các giải pháp theo thứ tự 
 | 4 | **`useMemo`/`useCallback`** ổn định props | Thêm dependency array, dễ sai; chỉ khi cần cho memo/effect |
 | 5 | **Tách Context / selector** | Khi context kéo cả cây render |
 
-> [!IMPORTANT]
-> Hai cách rẻ nhất và nên thử **trước** mọi `memo`: (1) **đưa state xuống thấp** (colocation) để re-render chỉ ảnh hưởng vùng nhỏ; (2) **lift phần nặng thành `children`** truyền qua props để nó không render lại khi cha đổi state. Xem [Composition](/patterns/composition/).
+<Callout type="info" title="Important">
+
+Hai cách rẻ nhất và nên thử **trước** mọi `memo`: (1) **đưa state xuống thấp** (colocation) để re-render chỉ ảnh hưởng vùng nhỏ; (2) **lift phần nặng thành `children`** truyền qua props để nó không render lại khi cha đổi state. Xem [Composition](/patterns/composition/).
+
+</Callout>
 
 ---
 
@@ -179,11 +197,17 @@ graph LR
     B --> C["Code đã chèn memo<br/>tự động"]
 ```
 
-> [!NOTE]
-> Dù vậy, **hiểu cơ chế** vẫn cực kỳ quan trọng: để đọc code cũ, để debug khi compiler không áp dụng được (vì code vi phạm Rules of React), và để biết vì sao app chậm. Compiler là công cụ, không thay thế hiểu biết. Các bài sau dạy bạn bản chất; nếu dự án đã bật Compiler, hãy coi memoization thủ công là "tùy chọn" thay vì bắt buộc.
+<Callout type="info" title="Note">
 
-> [!WARNING]
-> React Compiler chỉ hoạt động đúng khi code **tuân thủ Rules of React** (component/hook thuần, không mutate props/state). Code vi phạm sẽ bị compiler **bỏ qua** (không memo) — và bạn lại cần kiến thức thủ công. Vì vậy đừng coi compiler là lý do để viết ẩu.
+Dù vậy, **hiểu cơ chế** vẫn cực kỳ quan trọng: để đọc code cũ, để debug khi compiler không áp dụng được (vì code vi phạm Rules of React), và để biết vì sao app chậm. Compiler là công cụ, không thay thế hiểu biết. Các bài sau dạy bạn bản chất; nếu dự án đã bật Compiler, hãy coi memoization thủ công là "tùy chọn" thay vì bắt buộc.
+
+</Callout>
+
+<Callout type="warn" title="Warning">
+
+React Compiler chỉ hoạt động đúng khi code **tuân thủ Rules of React** (component/hook thuần, không mutate props/state). Code vi phạm sẽ bị compiler **bỏ qua** (không memo) — và bạn lại cần kiến thức thủ công. Vì vậy đừng coi compiler là lý do để viết ẩu.
+
+</Callout>
 
 ---
 

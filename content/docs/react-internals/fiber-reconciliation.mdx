@@ -49,8 +49,11 @@ graph LR
     C --> D["Renderer<br/>(react-dom) áp vào DOM ở pha commit"]
 ```
 
-> [!IMPORTANT]
-> **Element** vs **Fiber** là phân biệt nền tảng nhất của bài này. **Element** là object mô tả UI bạn trả về từ component (`{ type, props, key }`) — sinh ra mỗi lần render rồi vứt đi. **Fiber** là object **tồn tại lâu dài**: mỗi component/DOM node có đúng một fiber, lưu state, hooks, ref, vị trí trong cây, và "việc cần làm". React 19 vẫn dùng kiến trúc Fiber này.
+<Callout type="info" title="Important">
+
+**Element** vs **Fiber** là phân biệt nền tảng nhất của bài này. **Element** là object mô tả UI bạn trả về từ component (`{ type, props, key }`) — sinh ra mỗi lần render rồi vứt đi. **Fiber** là object **tồn tại lâu dài**: mỗi component/DOM node có đúng một fiber, lưu state, hooks, ref, vị trí trong cây, và "việc cần làm". React 19 vẫn dùng kiến trúc Fiber này.
+
+</Callout>
 
 **Bức tranh toàn cảnh — đặt Fiber vào đúng chỗ trong pipeline:**
 
@@ -97,8 +100,11 @@ Fiber **tái hiện call stack bằng một cấu trúc dữ liệu của riêng
 - **Ưu tiên** việc gấp (gõ phím, click) hơn việc không gấp (render danh sách lớn) — qua hệ thống **lanes**.
 - **Hủy** một render đang dang dở nếu có update mới quan trọng hơn, rồi bắt đầu lại từ đầu mà không để lại UI hỏng (vì chưa đụng DOM).
 
-> [!NOTE]
-> "Async" ở đây **không** liên quan tới `Promise`/`await`. Đó là **cooperative scheduling**: React tự nguyện nhả quyền điều khiển theo từng lát thời gian (time slicing), dựa trên scheduler nội bộ (`scheduler` package) chứ không phải thread thật. JavaScript vẫn single-threaded.
+<Callout type="info" title="Note">
+
+"Async" ở đây **không** liên quan tới `Promise`/`await`. Đó là **cooperative scheduling**: React tự nguyện nhả quyền điều khiển theo từng lát thời gian (time slicing), dựa trên scheduler nội bộ (`scheduler` package) chứ không phải thread thật. JavaScript vẫn single-threaded.
+
+</Callout>
 
 ---
 
@@ -181,8 +187,11 @@ function Good({ show }: { show: boolean }) {
 }
 ```
 
-> [!WARNING]
-> Gọi hook trong `if`/`for`/sau `return` sớm làm **lệch danh sách hook**. React khớp hook theo **vị trí**, không theo tên — nên một state có thể bất ngờ nhận giá trị của hook khác. ESLint rule `react-hooks/rules-of-hooks` bắt lỗi này.
+<Callout type="warn" title="Warning">
+
+Gọi hook trong `if`/`for`/sau `return` sớm làm **lệch danh sách hook**. React khớp hook theo **vị trí**, không theo tên — nên một state có thể bất ngờ nhận giá trị của hook khác. ESLint rule `react-hooks/rules-of-hooks` bắt lỗi này.
+
+</Callout>
 
 Cây fiber được duyệt **depth-first** dùng `child` → `sibling` → `return`:
 
@@ -218,8 +227,11 @@ graph LR
     end
 ```
 
-> [!TIP]
-> Tái dùng object fiber cũ (clone `current` thành WIP qua `alternate` thay vì tạo mới hoàn toàn) giúp giảm áp lực cho bộ thu gom rác (GC) — một lý do React mượt khi update liên tục. Cơ chế này cũng giải thích vì sao việc dựng WIP **gián đoạn được**: cây current vẫn nguyên vẹn, lỡ bỏ WIP dang dở cũng không sao.
+<Callout type="info" title="Tip">
+
+Tái dùng object fiber cũ (clone `current` thành WIP qua `alternate` thay vì tạo mới hoàn toàn) giúp giảm áp lực cho bộ thu gom rác (GC) — một lý do React mượt khi update liên tục. Cơ chế này cũng giải thích vì sao việc dựng WIP **gián đoạn được**: cây current vẫn nguyên vẹn, lỡ bỏ WIP dang dở cũng không sao.
+
+</Callout>
 
 ---
 
@@ -264,8 +276,11 @@ graph TD
 | **Đi xuống** | `beginWork` | Gọi function component (chạy code của bạn), tính element con, **reconcile** (diff) con mới với con cũ, gắn `flags` (Placement/Update). Hoặc **bailout** nếu không có gì đổi. |
 | **Đi lên** | `completeWork` | Với host component (`<div>`): **tạo DOM node thật trong bộ nhớ** (chưa gắn vào trang), set thuộc tính, gom `subtreeFlags` từ con lên cha (tạo effect list). |
 
-> [!IMPORTANT]
-> DOM node thật được **tạo ở `completeWork`** (trong pha render, trong bộ nhớ) nhưng **gắn vào trang ở pha commit**. Vì việc tạo node nằm trong bộ nhớ, nó vẫn an toàn để gián đoạn — chưa có gì hiển thị cho user.
+<Callout type="info" title="Important">
+
+DOM node thật được **tạo ở `completeWork`** (trong pha render, trong bộ nhớ) nhưng **gắn vào trang ở pha commit**. Vì việc tạo node nằm trong bộ nhớ, nó vẫn an toàn để gián đoạn — chưa có gì hiển thị cho user.
+
+</Callout>
 
 ### 4.2 Effect list — danh sách "việc cần commit"
 
@@ -295,8 +310,11 @@ graph TD
     B -->|"Không"| D["BAILOUT: bỏ qua cả nhánh ✅"]
 ```
 
-> [!NOTE]
-> Đây chính là cơ chế đằng sau `React.memo`: nó thêm một bước so sánh props ở `beginWork` để **kích hoạt bailout** sớm hơn. Hiểu bailout giúp bạn biết vì sao đôi khi `memo` vô dụng (xem bài [Referential Equality](/toi-uu-rerender/referential-equality/)) — nếu props là object/hàm tạo mới mỗi lần, so sánh luôn ra "khác" và bailout không xảy ra.
+<Callout type="info" title="Note">
+
+Đây chính là cơ chế đằng sau `React.memo`: nó thêm một bước so sánh props ở `beginWork` để **kích hoạt bailout** sớm hơn. Hiểu bailout giúp bạn biết vì sao đôi khi `memo` vô dụng (xem bài [Referential Equality](/toi-uu-rerender/referential-equality/)) — nếu props là object/hàm tạo mới mỗi lần, so sánh luôn ra "khác" và bailout không xảy ra.
+
+</Callout>
 
 ---
 
@@ -322,16 +340,19 @@ Nếu `type` ở **cùng vị trí** khác nhau (ví dụ `<div>` đổi thành 
 // → <Counter> bị UNMOUNT rồi MOUNT lại → state reset về 0!
 ```
 
-> [!WARNING]
-> Đổi type của phần tử cha sẽ **reset toàn bộ state** của subtree con (kể cả input đang gõ dở, scroll position, focus). Đây là nguyên nhân bug "state tự nhiên mất" rất khó tìm. Tránh tạo component **bên trong** render của component khác — mỗi lần render type là một hàm mới → React coi là khác type → reset:
->
-> ```tsx
-> // ❌ Parent định nghĩa Child bên trong → mỗi render là type MỚI
-> function Parent() {
->   function Child() { return <input />; } // type khác nhau mỗi lần!
->   return <Child />;
-> }
-> ```
+<Callout type="warn" title="Warning">
+
+Đổi type của phần tử cha sẽ **reset toàn bộ state** của subtree con (kể cả input đang gõ dở, scroll position, focus). Đây là nguyên nhân bug "state tự nhiên mất" rất khó tìm. Tránh tạo component **bên trong** render của component khác — mỗi lần render type là một hàm mới → React coi là khác type → reset:
+
+```tsx
+// ❌ Parent định nghĩa Child bên trong → mỗi render là type MỚI
+function Parent() {
+  function Child() { return <input />; } // type khác nhau mỗi lần!
+  return <Child />;
+}
+```
+
+</Callout>
 
 ### 5.3 Quy tắc 2: cùng type → giữ node, cập nhật prop
 
@@ -380,8 +401,11 @@ function Search() {
 }
 ```
 
-> [!IMPORTANT]
-> `startTransition` báo cho React: "update này không gấp". Nếu user gõ tiếp, React **vứt bỏ** render danh sách đang dang dở và làm lại với giá trị mới — không khóa ô input. Điều này chỉ khả thi vì pha render gián đoạn được, nhờ Fiber.
+<Callout type="info" title="Important">
+
+`startTransition` báo cho React: "update này không gấp". Nếu user gõ tiếp, React **vứt bỏ** render danh sách đang dang dở và làm lại với giá trị mới — không khóa ô input. Điều này chỉ khả thi vì pha render gián đoạn được, nhờ Fiber.
+
+</Callout>
 
 ### 6.1 Lanes — hệ thống ưu tiên bằng bitmask
 
@@ -402,8 +426,11 @@ graph LR
     S --> R["Render nhóm lane đó trước; lane thấp có thể bị ngắt giữa chừng"]
 ```
 
-> [!NOTE]
-> Đây là lý do `startTransition` khác `setTimeout`: transition không bị đẩy ra cuối hàng đợi macrotask, nó vẫn chạy sớm nhưng **có thể bị ngắt** bởi update gấp hơn. Nó là một mức ưu tiên, không phải một độ trễ.
+<Callout type="info" title="Note">
+
+Đây là lý do `startTransition` khác `setTimeout`: transition không bị đẩy ra cuối hàng đợi macrotask, nó vẫn chạy sớm nhưng **có thể bị ngắt** bởi update gấp hơn. Nó là một mức ưu tiên, không phải một độ trễ.
+
+</Callout>
 
 ### 6.2 Vì sao commit KHÔNG gián đoạn được
 
@@ -505,8 +532,11 @@ Gõ nhanh liên tục: ô input **không** bị khựng dù danh sách 20.000 ph
   </Step>
 </Steps>
 
-> [!TIP]
-> Đừng tối ưu mù. Luôn **đo trước** bằng Profiler để biết fiber nào thực sự đắt, rồi mới quyết định `memo`/`useMemo`. Xem [Tổng quan tối ưu re-render](/toi-uu-rerender/tong-quan-toi-uu/).
+<Callout type="info" title="Tip">
+
+Đừng tối ưu mù. Luôn **đo trước** bằng Profiler để biết fiber nào thực sự đắt, rồi mới quyết định `memo`/`useMemo`. Xem [Tổng quan tối ưu re-render](/toi-uu-rerender/tong-quan-toi-uu/).
+
+</Callout>
 
 ---
 

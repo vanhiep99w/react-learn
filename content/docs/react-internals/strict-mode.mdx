@@ -29,8 +29,11 @@ description: "Công cụ dev-only của React: double-invoke render & effects đ
 
 **Strict Mode** (`<StrictMode>`) là một công cụ **chỉ chạy ở môi trường development** giúp phát hiện sớm các lỗi tiềm ẩn trong component: side-effect đặt sai chỗ, effect thiếu cleanup, dùng API đã lỗi thời. Nó **không render ra UI nào** và **không ảnh hưởng tới production build**.
 
-> [!IMPORTANT]
-> Cách hoạt động chính của StrictMode là **cố tình gọi lặp lại** một số hàm (render, initializer, effect) trong dev để "ép lộ" những đoạn code không **idempotent** (chạy lại cho kết quả khác). Nếu code của bạn đúng theo mô hình `UI = f(state)` thuần khiết, double-invoke **không** làm gì hại; nếu nó làm vỡ thứ gì, đó chính là bug StrictMode muốn bạn thấy.
+<Callout type="info" title="Important">
+
+Cách hoạt động chính của StrictMode là **cố tình gọi lặp lại** một số hàm (render, initializer, effect) trong dev để "ép lộ" những đoạn code không **idempotent** (chạy lại cho kết quả khác). Nếu code của bạn đúng theo mô hình `UI = f(state)` thuần khiết, double-invoke **không** làm gì hại; nếu nó làm vỡ thứ gì, đó chính là bug StrictMode muốn bạn thấy.
+
+</Callout>
 
 ---
 
@@ -64,8 +67,11 @@ function App() {
 }
 ```
 
-> [!NOTE]
-> Trong **Next.js**, không bọc `<StrictMode>` thủ công — bật bằng cờ `reactStrictMode: true` trong `next.config.js` (mặc định đã bật ở nhiều phiên bản). Create React App / Vite template cũng bọc sẵn `<StrictMode>` trong file entry.
+<Callout type="info" title="Note">
+
+Trong **Next.js**, không bọc `<StrictMode>` thủ công — bật bằng cờ `reactStrictMode: true` trong `next.config.js` (mặc định đã bật ở nhiều phiên bản). Create React App / Vite template cũng bọc sẵn `<StrictMode>` trong file entry.
+
+</Callout>
 
 ---
 
@@ -106,15 +112,21 @@ function GoodList({ items }: { items: { id: string; text: string }[] }) {
 }
 ```
 
-> [!WARNING]
-> Mutate biến module, đẩy vào mảng ngoài, ghi vào `ref.current`, hay gọi API **ngay trong thân render** đều là side-effect. Double-invoke của StrictMode sẽ làm chúng chạy 2 lần → kết quả lệch. Side-effect phải nằm trong event handler hoặc `useEffect`, không phải trong render.
+<Callout type="warn" title="Warning">
+
+Mutate biến module, đẩy vào mảng ngoài, ghi vào `ref.current`, hay gọi API **ngay trong thân render** đều là side-effect. Double-invoke của StrictMode sẽ làm chúng chạy 2 lần → kết quả lệch. Side-effect phải nằm trong event handler hoặc `useEffect`, không phải trong render.
+
+</Callout>
 
 ### 2.2 Vì sao console.log bị làm mờ
 
 Vì component chạy 2 lần, `console.log` trong render cũng in **2 lần**. Để đỡ rối, React **làm mờ (greyed out)** nhóm log lần thứ hai trong DevTools console thay vì in trùng rõ ràng.
 
-> [!TIP]
-> Nếu thấy log của mình in đôi (một dòng mờ) trong dev — đó là StrictMode, **không** phải bug. Ở production chỉ chạy một lần. Có thể tắt tính năng làm mờ này trong cài đặt console của React DevTools nếu muốn thấy đủ.
+<Callout type="info" title="Tip">
+
+Nếu thấy log của mình in đôi (một dòng mờ) trong dev — đó là StrictMode, **không** phải bug. Ở production chỉ chạy một lần. Có thể tắt tính năng làm mờ này trong cài đặt console của React DevTools nếu muốn thấy đủ.
+
+</Callout>
 
 ---
 
@@ -141,8 +153,11 @@ useEffect(() => {
 }, [roomId]);
 ```
 
-> [!IMPORTANT]
-> Nếu effect **thiếu cleanup**, double-invoke sẽ để lại "rác": 2 kết nối WebSocket, 2 listener, 2 interval... StrictMode phơi bày điều này ngay trong dev thay vì để bạn phát hiện qua memory leak ở production.
+<Callout type="info" title="Important">
+
+Nếu effect **thiếu cleanup**, double-invoke sẽ để lại "rác": 2 kết nối WebSocket, 2 listener, 2 interval... StrictMode phơi bày điều này ngay trong dev thay vì để bạn phát hiện qua memory leak ở production.
+
+</Callout>
 
 ### 3.1 Bẫy kinh điển: API gọi 2 lần
 
@@ -159,8 +174,11 @@ useEffect(() => {
 }, [id]);
 ```
 
-> [!NOTE]
-> Với data fetching thật, dùng **TanStack Query** / **SWR** — chúng tự dedupe nên request đôi trong dev cũng được gộp. Xem [Code-splitting](/toi-uu-rerender/code-splitting/).
+<Callout type="info" title="Note">
+
+Với data fetching thật, dùng **TanStack Query** / **SWR** — chúng tự dedupe nên request đôi trong dev cũng được gộp. Xem [Code-splitting](/toi-uu-rerender/code-splitting/).
+
+</Callout>
 
 ---
 
@@ -196,8 +214,11 @@ Ngoài double-invoke, StrictMode còn cảnh báo các mẫu lỗi thời / nguy
 | Render không thuần | Phơi bày qua double-invoke render (mục 2) |
 | `UNSAFE_` lifecycle | Cảnh báo các method class lỗi thời (`UNSAFE_componentWillMount`...) |
 
-> [!NOTE]
-> Các cảnh báo deprecated chủ yếu liên quan code cũ (class component, React đời trước). Code function + hooks hiện đại hầu như chỉ gặp hai loại double-invoke ở trên.
+<Callout type="info" title="Note">
+
+Các cảnh báo deprecated chủ yếu liên quan code cũ (class component, React đời trước). Code function + hooks hiện đại hầu như chỉ gặp hai loại double-invoke ở trên.
+
+</Callout>
 
 ---
 
@@ -211,14 +232,17 @@ Ngoài double-invoke, StrictMode còn cảnh báo các mẫu lỗi thời / nguy
 | `useMemo` / `useCallback` callback | — |
 | Effect setup + cleanup (mount lần đầu) | — |
 
-> [!WARNING]
-> Vì **initializer** và **updater** bị gọi 2 lần, tuyệt đối **không** đặt side-effect trong chúng:
-> ```tsx
-> // ❌ side-effect trong updater → chạy 2 lần
-> setCount((c) => { logToServer(c); return c + 1; });
-> // ✅ updater thuần; side-effect tách ra event handler
-> setCount((c) => c + 1);
-> ```
+<Callout type="warn" title="Warning">
+
+Vì **initializer** và **updater** bị gọi 2 lần, tuyệt đối **không** đặt side-effect trong chúng:
+```tsx
+// ❌ side-effect trong updater → chạy 2 lần
+setCount((c) => { logToServer(c); return c + 1; });
+// ✅ updater thuần; side-effect tách ra event handler
+setCount((c) => c + 1);
+```
+
+</Callout>
 
 ---
 
@@ -243,15 +267,21 @@ Ngoài double-invoke, StrictMode còn cảnh báo các mẫu lỗi thời / nguy
   </Step>
 </Steps>
 
-> [!TIP]
-> Nguyên tắc vàng: nếu việc gì **chỉ được xảy ra một lần khi người dùng làm gì đó** (gửi form, mua hàng) → đặt trong **event handler**, không phải effect. Effect là để **đồng bộ**, mà đồng bộ thì lặp lại được.
+<Callout type="info" title="Tip">
+
+Nguyên tắc vàng: nếu việc gì **chỉ được xảy ra một lần khi người dùng làm gì đó** (gửi form, mua hàng) → đặt trong **event handler**, không phải effect. Effect là để **đồng bộ**, mà đồng bộ thì lặp lại được.
+
+</Callout>
 
 ---
 
 ## 8. StrictMode trong production
 
-> [!IMPORTANT]
-> StrictMode **không có tác dụng gì ở production**: không double-invoke, không cảnh báo, không chi phí. Toàn bộ kiểm tra chỉ chạy ở development. Vì vậy **luôn để StrictMode bật** — bạn được lợi khi dev mà không trả giá khi chạy thật.
+<Callout type="info" title="Important">
+
+StrictMode **không có tác dụng gì ở production**: không double-invoke, không cảnh báo, không chi phí. Toàn bộ kiểm tra chỉ chạy ở development. Vì vậy **luôn để StrictMode bật** — bạn được lợi khi dev mà không trả giá khi chạy thật.
+
+</Callout>
 
 ```mermaid
 graph LR

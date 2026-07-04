@@ -28,11 +28,17 @@ description: "Key là danh tính phần tử trong reconciliation — cơ chế 
 
 Khi render một danh sách, React cần biết: sau khi dữ liệu đổi (thêm/xóa/sắp xếp lại), phần tử nào trong cây mới **tương ứng** với phần tử nào trong cây cũ? `key` là **danh tính ổn định** trả lời câu hỏi đó.
 
-> [!IMPORTANT]
-> `key` **không** được truyền vào component như một prop. Nó là tín hiệu **nội bộ** cho thuật toán reconciliation (xem [Fiber & Reconciliation](/react-internals/fiber-reconciliation/)) để khớp fiber cũ với element mới. Chọn sai key → React khớp nhầm → state, DOM, animation bị "dính" sai phần tử.
+<Callout type="info" title="Important">
 
-> [!NOTE]
-> Vì `key` không phải prop, bạn **không** đọc được nó trong component con (`props.key` là `undefined`). Nếu cần dùng giá trị đó bên trong con, hãy truyền lại qua một prop khác: `<Row key={id} id={id} />`.
+`key` **không** được truyền vào component như một prop. Nó là tín hiệu **nội bộ** cho thuật toán reconciliation (xem [Fiber & Reconciliation](/react-internals/fiber-reconciliation/)) để khớp fiber cũ với element mới. Chọn sai key → React khớp nhầm → state, DOM, animation bị "dính" sai phần tử.
+
+</Callout>
+
+<Callout type="info" title="Note">
+
+Vì `key` không phải prop, bạn **không** đọc được nó trong component con (`props.key` là `undefined`). Nếu cần dùng giá trị đó bên trong con, hãy truyền lại qua một prop khác: `<Row key={id} id={id} />`.
+
+</Callout>
 
 ---
 
@@ -91,8 +97,11 @@ Tóm tắt 3 quyết định React đưa ra cho mỗi phần tử trong danh sá
 | `key` mới không khớp ai | Mount mới |
 | `key` cũ không còn dùng | Unmount (chạy cleanup effect) |
 
-> [!TIP]
-> Vì React khớp theo `key` trước rồi mới so `type`, một `key` ổn định cho phép React "nhận ra" phần tử dù nó nhảy vị trí — chỉ cần **di chuyển** DOM node thay vì xoá đi tạo lại.
+<Callout type="info" title="Tip">
+
+Vì React khớp theo `key` trước rồi mới so `type`, một `key` ổn định cho phép React "nhận ra" phần tử dù nó nhảy vị trí — chỉ cần **di chuyển** DOM node thay vì xoá đi tạo lại.
+
+</Callout>
 
 ---
 
@@ -140,8 +149,11 @@ export default function App() {
 
 React thấy "vẫn còn key=0 và key=1" nên **giữ nguyên** DOM input cũ (cùng nội dung gõ), chỉ đổi mỗi text bên cạnh. Danh tính bị gán sai.
 
-> [!TIP]
-> Đổi `key={index}` thành `key={item}` (hoặc id ổn định) thì React biết "Táo" đã biến mất, remove đúng ô của Táo, giữ đúng ô Chuối="BBB", Cam="CCC". Hãy thử để thấy bug biến mất.
+<Callout type="info" title="Tip">
+
+Đổi `key={index}` thành `key={item}` (hoặc id ổn định) thì React biết "Táo" đã biến mất, remove đúng ô của Táo, giữ đúng ô Chuối="BBB", Cam="CCC". Hãy thử để thấy bug biến mất.
+
+</Callout>
 
 ### 4.3 Không chỉ input — còn hiệu năng & animation
 
@@ -227,8 +239,11 @@ Vì đổi key = "đây là phần tử khác" → React remount component (rese
 <ProfileForm key={userId} userId={userId} />
 ```
 
-> [!NOTE]
-> Đây là cách "chính thống" để reset state khi chuyển ngữ cảnh (vd chuyển hồ sơ người dùng), thay vì viết `useEffect` thủ công để xóa từng field. Liên quan tới quy tắc "key đổi → fiber mới" ở bài Fiber.
+<Callout type="info" title="Note">
+
+Đây là cách "chính thống" để reset state khi chuyển ngữ cảnh (vd chuyển hồ sơ người dùng), thay vì viết `useEffect` thủ công để xóa từng field. Liên quan tới quy tắc "key đổi → fiber mới" ở bài Fiber.
+
+</Callout>
 
 ```tsx
 // Ví dụ: reset form khi chuyển tab, không cần xoá thủ công từng field
@@ -237,8 +252,11 @@ function Editor({ tabId }: { tabId: string }) {
 }
 ```
 
-> [!WARNING]
-> Đây là con dao hai lưỡi: đổi key cũng **xoá toàn bộ** state, làm chạy lại effect mount, mất focus/scroll. Chỉ dùng khi bạn **thật sự muốn** reset hoàn toàn — đừng vô tình đặt key động lên component không muốn remount.
+<Callout type="warn" title="Warning">
+
+Đây là con dao hai lưỡi: đổi key cũng **xoá toàn bộ** state, làm chạy lại effect mount, mất focus/scroll. Chỉ dùng khi bạn **thật sự muốn** reset hoàn toàn — đừng vô tình đặt key động lên component không muốn remount.
+
+</Callout>
 
 ---
 

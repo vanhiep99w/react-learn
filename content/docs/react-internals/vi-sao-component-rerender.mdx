@@ -33,8 +33,11 @@ description: "Ba nguyên nhân khiến component render lại, cơ chế snapsho
 
 "Vì sao component của tôi cứ render lại?" là câu hỏi phổ biến nhất khi tối ưu React. Tin tốt: số nguyên nhân **rất ít** và rất xác định.
 
-> [!IMPORTANT]
-> Một component re-render **chỉ** vì 3 lý do: (1) **state của chính nó** đổi, (2) **component cha** re-render, hoặc (3) **context** mà nó đang đọc đổi giá trị. Props đổi **không phải** là một nguyên nhân độc lập — props chỉ đổi được khi cha re-render. Ghi nhớ điều này tiết kiệm cho bạn hàng giờ debug.
+<Callout type="info" title="Important">
+
+Một component re-render **chỉ** vì 3 lý do: (1) **state của chính nó** đổi, (2) **component cha** re-render, hoặc (3) **context** mà nó đang đọc đổi giá trị. Props đổi **không phải** là một nguyên nhân độc lập — props chỉ đổi được khi cha re-render. Ghi nhớ điều này tiết kiệm cho bạn hàng giờ debug.
+
+</Callout>
 
 Bài này dựa trên [Render Pipeline](/react-internals/render-pipeline/) (3 pha) và [Fiber](/react-internals/fiber-reconciliation/) (cơ chế bailout). Nếu chưa đọc, nên đọc trước để hiểu "render" ≠ "đụng DOM".
 
@@ -87,8 +90,11 @@ function Counter() {
 
 Bấm nút: `count` chỉ tăng lên **1**, không phải 3.
 
-> [!NOTE]
-> Hãy hình dung: trong suốt `handleClick`, `count` giống như một bức ảnh chụp tại thời điểm render — đứng yên ở `0`. Ba dòng `setCount(count + 1)` đều tính `0 + 1`. Muốn cộng dồn thực sự, dùng **updater function** (mục 4).
+<Callout type="info" title="Note">
+
+Hãy hình dung: trong suốt `handleClick`, `count` giống như một bức ảnh chụp tại thời điểm render — đứng yên ở `0`. Ba dòng `setCount(count + 1)` đều tính `0 + 1`. Muốn cộng dồn thực sự, dùng **updater function** (mục 4).
+
+</Callout>
 
 **Phép loại suy:** `count` như giá ghi trên menu lúc bạn ngồi xuống. Dù nhà hàng có đổi giá (state mới), tờ menu **của bạn** trong bữa này vẫn in giá cũ. Phải gọi món lần sau (render mới) mới thấy menu mới.
 
@@ -132,8 +138,11 @@ function GoodTimer() {
 }
 ```
 
-> [!WARNING]
-> Khi callback "sống lâu" cần giá trị state mới nhất: hoặc dùng **updater function** (`c => c + 1`), hoặc đưa state vào dependency array để effect tạo lại closure mới, hoặc lưu vào `useRef`. Đừng đọc trực tiếp biến state trong callback bất đồng bộ tồn tại lâu.
+<Callout type="warn" title="Warning">
+
+Khi callback "sống lâu" cần giá trị state mới nhất: hoặc dùng **updater function** (`c => c + 1`), hoặc đưa state vào dependency array để effect tạo lại closure mới, hoặc lưu vào `useRef`. Đừng đọc trực tiếp biến state trong callback bất đồng bộ tồn tại lâu.
+
+</Callout>
 
 ---
 
@@ -165,8 +174,11 @@ sequenceDiagram
 
 ### 3.1 React 18 batch ở mọi nơi
 
-> [!TIP]
-> Từ **React 18** (với `createRoot`), batching được tự động áp dụng **ở mọi nơi**: trong event handler, trong `setTimeout`, trong promise `.then`, trong native event. Trước React 18, các update ngoài event handler (vd trong `setTimeout`) **không** được gộp và gây render dư. Nếu bạn nâng cấp từ React cũ và thấy số lần render giảm, đây là lý do.
+<Callout type="info" title="Tip">
+
+Từ **React 18** (với `createRoot`), batching được tự động áp dụng **ở mọi nơi**: trong event handler, trong `setTimeout`, trong promise `.then`, trong native event. Trước React 18, các update ngoài event handler (vd trong `setTimeout`) **không** được gộp và gây render dư. Nếu bạn nâng cấp từ React cũ và thấy số lần render giảm, đây là lý do.
+
+</Callout>
 
 ```tsx
 // React 18: cả 2 setState trong .then vẫn gộp thành 1 render
@@ -191,8 +203,11 @@ function onClick() {
 }
 ```
 
-> [!CAUTION]
-> `flushSync` phá vỡ batching → có thể gây nhiều lần render/commit liên tiếp, ảnh hưởng performance. Chỉ dùng khi thật sự cần đọc DOM đã cập nhật giữa chừng.
+<Callout type="error" title="Caution">
+
+`flushSync` phá vỡ batching → có thể gây nhiều lần render/commit liên tiếp, ảnh hưởng performance. Chỉ dùng khi thật sự cần đọc DOM đã cập nhật giữa chừng.
+
+</Callout>
 
 ---
 
@@ -237,8 +252,11 @@ setCount((c) => c + 1); // đẩy "hàm +1"
 
 Kết quả cuối: `count = 6`. Hiểu bảng này giúp bạn lý giải mọi hành vi "kỳ lạ" của nhiều `setState` trộn lẫn.
 
-> [!IMPORTANT]
-> Quy tắc an toàn: nếu giá trị mới phụ thuộc giá trị hiện tại của state (đếm, toggle, push vào mảng...) → dùng updater function. Nó cũng giúp bỏ state khỏi mảng phụ thuộc của `useCallback`/`useEffect`.
+<Callout type="info" title="Important">
+
+Quy tắc an toàn: nếu giá trị mới phụ thuộc giá trị hiện tại của state (đếm, toggle, push vào mảng...) → dùng updater function. Nó cũng giúp bỏ state khỏi mảng phụ thuộc của `useCallback`/`useEffect`.
+
+</Callout>
 
 ---
 
@@ -274,8 +292,11 @@ graph TD
     C1 --> G1["Cháu render"]
 ```
 
-> [!TIP]
-> Mẹo "children làm slot": nếu truyền component nặng qua prop `children`, nó được tạo ở **component cha cao hơn** và **không** re-render khi state của component giữa thay đổi. Đây là cách tối ưu không cần `memo` — chi tiết ở [Composition](/patterns/composition/).
+<Callout type="info" title="Tip">
+
+Mẹo "children làm slot": nếu truyền component nặng qua prop `children`, nó được tạo ở **component cha cao hơn** và **không** re-render khi state của component giữa thay đổi. Đây là cách tối ưu không cần `memo` — chi tiết ở [Composition](/patterns/composition/).
+
+</Callout>
 
 ### 5.1 Không phải con nào cũng bị render — element reference stability
 
@@ -316,8 +337,11 @@ function Parent({ children, lastChild }) {
 
 **Cơ chế gốc:** mỗi lần `Parent` render, code `<ChildA />` chạy lại → tạo `{ type: ChildA, props: {} }` **mới** (khác tham chiếu so với lần trước). React so sánh element cũ vs mới bằng `Object.is` → khác → render. Trong khi `children` và `lastChild` là props nhận từ `App` — mà `App` **không** re-render, nên element giữ nguyên tham chiếu → React bailout.
 
-> [!IMPORTANT]
-> Đây chính là lý do kỹ thuật "nâng component lên làm children" (composition) giúp tối ưu mà **không** cần `memo`: element được tạo ở tầng cao hơn (không re-render) nên tham chiếu ổn định tự nhiên. Xem [Composition — performance](/patterns/composition/#5-composition-là-một-tối-ưu-performance).
+<Callout type="info" title="Important">
+
+Đây chính là lý do kỹ thuật "nâng component lên làm children" (composition) giúp tối ưu mà **không** cần `memo`: element được tạo ở tầng cao hơn (không re-render) nên tham chiếu ổn định tự nhiên. Xem [Composition — performance](/patterns/composition/#5-composition-là-một-tối-ưu-performance).
+
+</Callout>
 
 ---
 
@@ -340,8 +364,11 @@ function Provider({ children }) {
 }
 ```
 
-> [!WARNING]
-> Tạo `value={{ ... }}` mới mỗi render khiến **toàn bộ** consumer re-render liên tục. Cách xử lý (memo hóa value, tách context theo tần suất đổi) được trình bày kỹ ở [Context Optimization](/toi-uu-rerender/context-optimization/).
+<Callout type="warn" title="Warning">
+
+Tạo `value={{ ... }}` mới mỗi render khiến **toàn bộ** consumer re-render liên tục. Cách xử lý (memo hóa value, tách context theo tần suất đổi) được trình bày kỹ ở [Context Optimization](/toi-uu-rerender/context-optimization/).
+
+</Callout>
 
 ---
 
@@ -355,11 +382,17 @@ const [n, setN] = useState(0);
 setN(0); // n vẫn đang là 0 → React BAILOUT, không re-render các con
 ```
 
-> [!NOTE]
-> Một chi tiết tinh tế: khi set cùng giá trị, React **có thể vẫn gọi hàm component đó một lần** rồi mới quyết định bailout (nếu kết quả render giống hệt, nó dừng và không lan xuống con). Nên đừng ngạc nhiên nếu thấy một log render lẻ — điều quan trọng là **subtree con không bị render lại**.
+<Callout type="info" title="Note">
 
-> [!WARNING]
-> Bailout dựa trên `Object.is`. Với **object/array**, tạo object mới có cùng nội dung **không** được coi là bằng nhau → vẫn re-render. Đây là gốc rễ của vấn đề "referential equality" — đọc kỹ ở [bài riêng](/toi-uu-rerender/referential-equality/).
+Một chi tiết tinh tế: khi set cùng giá trị, React **có thể vẫn gọi hàm component đó một lần** rồi mới quyết định bailout (nếu kết quả render giống hệt, nó dừng và không lan xuống con). Nên đừng ngạc nhiên nếu thấy một log render lẻ — điều quan trọng là **subtree con không bị render lại**.
+
+</Callout>
+
+<Callout type="warn" title="Warning">
+
+Bailout dựa trên `Object.is`. Với **object/array**, tạo object mới có cùng nội dung **không** được coi là bằng nhau → vẫn re-render. Đây là gốc rễ của vấn đề "referential equality" — đọc kỹ ở [bài riêng](/toi-uu-rerender/referential-equality/).
+
+</Callout>
 
 ```tsx
 const [user, setUser] = useState({ name: 'An' });
@@ -390,12 +423,15 @@ graph TD
     U -->|"Không"| V["BAILOUT ✅ — bỏ qua render"]
 ```
 
-> [!NOTE]
-> Phân biệt **proactive** vs **passive** rendering giúp hiểu khi nào bailout áp dụng:
-> - **Proactive**: component tự schedule update (setState/useReducer) → bailout chỉ khi giá trị y hệt.
-> - **Passive**: component bị cha kéo theo → bailout nếu thoả 4 điều kiện trên.
->
-> `React.memo` hoạt động bằng cách **chủ động kiểm tra điều kiện 2** (so sánh props) ngay ở `beginWork`, thay vì để React dùng referential equality mặc định của element. Xem [Fiber — Bailout](/react-internals/fiber-reconciliation/#43-bailout--khi-react-bỏ-qua-cả-subtree).
+<Callout type="info" title="Note">
+
+Phân biệt **proactive** vs **passive** rendering giúp hiểu khi nào bailout áp dụng:
+- **Proactive**: component tự schedule update (setState/useReducer) → bailout chỉ khi giá trị y hệt.
+- **Passive**: component bị cha kéo theo → bailout nếu thoả 4 điều kiện trên.
+
+`React.memo` hoạt động bằng cách **chủ động kiểm tra điều kiện 2** (so sánh props) ngay ở `beginWork`, thay vì để React dùng referential equality mặc định của element. Xem [Fiber — Bailout](/react-internals/fiber-reconciliation/#43-bailout--khi-react-bỏ-qua-cả-subtree).
+
+</Callout>
 
 ---
 
