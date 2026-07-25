@@ -6,8 +6,15 @@
   --fd-font-mono: 'JetBrains Mono', monospace;
 }
 
-#nd-page article {
+/* Use the whole viewport instead of leaving large gutters outside both sidebars. */
+#nd-docs-layout {
+  --fd-layout-width: 100vw;
+}
+
+/* `#nd-page` is the article itself; let the middle content fill its grid column. */
+#nd-page {
   max-width: none;
+  padding-inline: clamp(1rem, 1.5vw, 1.5rem);
 }
 
 .prose {
