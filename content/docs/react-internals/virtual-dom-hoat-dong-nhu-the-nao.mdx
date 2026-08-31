@@ -1,35 +1,44 @@
 ---
 title: "Virtual DOM trong React hoạt động như thế nào?"
-description: "Từ JSX đến React Element, Fiber, reconciliation và commit DOM — giải thích đúng bản chất Virtual DOM, cách React tìm thay đổi và vì sao re-render không đồng nghĩa với cập nhật DOM"
+description: "Hiểu DOM trước, rồi phân biệt DOM thật với Virtual DOM, React Element, Fiber, reconciliation và commit trong React."
 ---
 
 <Callout type="info" title="Ý chính">
-  **Virtual DOM** là cách gọi mô hình UI được biểu diễn bằng dữ liệu JavaScript trong bộ nhớ. Trong React hiện đại, đừng hình dung nó chỉ là “hai bản sao DOM đem so sánh với nhau”. Mô hình chính xác hơn là: component tạo **React Element**, reconciler đối chiếu chúng với **cây Fiber hiện tại**, dựng cây Fiber đang làm dở, rồi `react-dom` chỉ áp các thay đổi cần thiết lên DOM thật.
+  **DOM** là cây object thật do browser cung cấp để biểu diễn trang web; browser dùng nó cùng CSS để tính layout, paint và xử lý tương tác. **Virtual DOM** là mô tả UI bằng dữ liệu JavaScript trong bộ nhớ của React. React đối chiếu mô tả mới với cây Fiber hiện tại, rồi `react-dom` chỉ áp các thay đổi cần thiết lên DOM thật.
 </Callout>
 
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [1. Virtual DOM là gì](#1-virtual-dom-là-gì)
-  - [1.1 Bốn khái niệm dễ bị trộn lẫn](#11-bốn-khái-niệm-dễ-bị-trộn-lẫn)
-- [2. JSX trở thành dữ liệu JavaScript](#2-jsx-trở-thành-dữ-liệu-javascript)
-- [3. Toàn bộ pipeline từ state đến pixel](#3-toàn-bộ-pipeline-từ-state-đến-pixel)
-  - [3.1 Lần render đầu tiên](#31-lần-render-đầu-tiên)
-  - [3.2 Những lần cập nhật sau](#32-những-lần-cập-nhật-sau)
-- [4. Reconciliation so sánh cây như thế nào](#4-reconciliation-so-sánh-cây-như-thế-nào)
-  - [4.1 Cùng type thì tái sử dụng](#41-cùng-type-thì-tái-sử-dụng)
-  - [4.2 Khác type thì thay cả nhánh](#42-khác-type-thì-thay-cả-nhánh)
-  - [4.3 Key xác định danh tính trong danh sách](#43-key-xác-định-danh-tính-trong-danh-sách)
-  - [4.4 Props và text được đối chiếu riêng](#44-props-và-text-được-đối-chiếu-riêng)
-- [5. Ví dụ từng bước với Counter](#5-ví-dụ-từng-bước-với-counter)
-- [6. Commit thay đổi DOM thật ra sao](#6-commit-thay-đổi-dom-thật-ra-sao)
-- [7. Virtual DOM liên quan gì đến Fiber](#7-virtual-dom-liên-quan-gì-đến-fiber)
-- [8. Vì sao re-render không đồng nghĩa với DOM update](#8-vì-sao-re-render-không-đồng-nghĩa-với-dom-update)
-- [9. Virtual DOM có luôn nhanh hơn DOM thật không](#9-virtual-dom-có-luôn-nhanh-hơn-dom-thật-không)
-- [10. Virtual DOM và Shadow DOM khác nhau](#10-virtual-dom-và-shadow-dom-khác-nhau)
-- [11. Thí nghiệm quan sát DOM được tái sử dụng](#11-thí-nghiệm-quan-sát-dom-được-tái-sử-dụng)
-- [12. Hiểu lầm thường gặp](#12-hiểu-lầm-thường-gặp)
-- [13. Câu hỏi tự kiểm tra](#13-câu-hỏi-tự-kiểm-tra)
+- [1. DOM là gì?](#1-dom-là-gì)
+  - [1.1 DOM được tạo và dùng ở đâu?](#11-dom-được-tạo-và-dùng-ở-đâu)
+  - [1.2 Làm việc trực tiếp với DOM](#12-làm-việc-trực-tiếp-với-dom)
+  - [1.3 Vì sao đồng bộ DOM thủ công dễ phức tạp?](#13-vì-sao-đồng-bộ-dom-thủ-công-dễ-phức-tạp)
+- [2. DOM thật và Virtual DOM](#2-dom-thật-và-virtual-dom)
+  - [2.1 So sánh nhanh](#21-so-sánh-nhanh)
+  - [2.2 React không đối chiếu JSX mới trực tiếp với DOM](#22-react-không-đối-chiếu-jsx-mới-trực-tiếp-với-dom)
+- [3. Virtual DOM là gì?](#3-virtual-dom-là-gì)
+  - [3.1 Bốn khái niệm dễ bị trộn lẫn](#31-bốn-khái-niệm-dễ-bị-trộn-lẫn)
+- [4. JSX trở thành dữ liệu JavaScript](#4-jsx-trở-thành-dữ-liệu-javascript)
+- [5. Toàn bộ pipeline từ state đến pixel](#5-toàn-bộ-pipeline-từ-state-đến-pixel)
+  - [5.1 Lần render đầu tiên](#51-lần-render-đầu-tiên)
+  - [5.2 Những lần cập nhật sau](#52-những-lần-cập-nhật-sau)
+- [6. Reconciliation so sánh cây như thế nào](#6-reconciliation-so-sánh-cây-như-thế-nào)
+  - [6.1 Cùng type thì tái sử dụng](#61-cùng-type-thì-tái-sử-dụng)
+  - [6.2 Khác type thì thay cả nhánh](#62-khác-type-thì-thay-cả-nhánh)
+  - [6.3 Key xác định danh tính trong danh sách](#63-key-xác-định-danh-tính-trong-danh-sách)
+  - [6.4 Props và text được đối chiếu riêng](#64-props-và-text-được-đối-chiếu-riêng)
+- [7. Ví dụ từng bước với Counter](#7-ví-dụ-từng-bước-với-counter)
+  - [Trạng thái ban đầu](#trạng-thái-ban-đầu)
+  - [Sau khi click](#sau-khi-click)
+- [8. Commit thay đổi DOM thật ra sao](#8-commit-thay-đổi-dom-thật-ra-sao)
+- [9. Virtual DOM liên quan gì đến Fiber](#9-virtual-dom-liên-quan-gì-đến-fiber)
+- [10. Vì sao re-render không đồng nghĩa với DOM update](#10-vì-sao-re-render-không-đồng-nghĩa-với-dom-update)
+- [11. Virtual DOM có luôn nhanh hơn DOM thật không](#11-virtual-dom-có-luôn-nhanh-hơn-dom-thật-không)
+- [12. Virtual DOM và Shadow DOM khác nhau](#12-virtual-dom-và-shadow-dom-khác-nhau)
+- [13. Thí nghiệm quan sát DOM được tái sử dụng](#13-thí-nghiệm-quan-sát-dom-được-tái-sử-dụng)
+- [14. Hiểu lầm thường gặp](#14-hiểu-lầm-thường-gặp)
+- [15. Câu hỏi tự kiểm tra](#15-câu-hỏi-tự-kiểm-tra)
 - [Thuật ngữ](#thuật-ngữ)
 - [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
@@ -75,7 +84,134 @@ graph LR
 
 ---
 
-## 1. Virtual DOM là gì
+## 1. DOM là gì?
+
+**DOM** (*Document Object Model*) là mô hình object mà browser tạo ra cho tài liệu HTML đang mở. Nó biến markup thành một cây node trong bộ nhớ để JavaScript có thể đọc, thay đổi và lắng nghe sự kiện.
+
+Ví dụ, từ HTML này:
+
+```html
+<main id="app">
+  <h1>Xin chào</h1>
+  <button>Đếm</button>
+</main>
+```
+
+browser tạo một cây DOM có thể hình dung như sau:
+
+```text
+Document
+└── html
+    └── body
+        └── main#app
+            ├── h1
+            │   └── "Xin chào"
+            └── button
+                └── "Đếm"
+```
+
+Mỗi phần tử như `<main>` hoặc `<button>` trở thành một object thật, chẳng hạn `HTMLElement` hoặc `HTMLButtonElement`. Text cũng là node thật. JavaScript có thể giữ tham chiếu tới các object này và browser dùng chúng để xử lý tương tác, focus, selection và khả năng truy cập.
+
+<Callout type="info" title="DOM không phải là HTML, CSSOM hay pixel">
+  HTML là **mã nguồn đầu vào** browser phân tích. DOM là **cây object có thể thay đổi khi trang đang chạy**. CSSOM là mô hình quy tắc CSS; browser kết hợp DOM và CSSOM để tính style, layout rồi paint pixel lên màn hình.
+</Callout>
+
+### 1.1 DOM được tạo và dùng ở đâu?
+
+Browser parse HTML để dựng DOM. Sau đó, khi JavaScript hoặc framework sửa node, browser cập nhật trạng thái tài liệu đang mở. DOM là giao diện lập trình chuẩn của browser, không phải khái niệm riêng của React.
+
+```js
+const button = document.querySelector('button');
+
+console.log(button instanceof HTMLButtonElement); // true
+console.log(button?.textContent); // "Đếm"
+```
+
+Một DOM node có hành vi mà object JavaScript mô tả UI không có. Ví dụ, `<input>` có thể nhận focus, giữ text người dùng đang gõ và phát sự kiện `input`. Các trạng thái này thuộc môi trường browser.
+
+### 1.2 Làm việc trực tiếp với DOM
+
+Với JavaScript thuần, bạn thay đổi UI bằng các DOM API mệnh lệnh: tìm node, tạo node, đặt nội dung hoặc thuộc tính, rồi gắn node vào đúng vị trí.
+
+```js
+const button = document.querySelector('#counter');
+let count = 0;
+
+button?.addEventListener('click', () => {
+  count += 1;
+  button.textContent = `Đã bấm ${count} lần`;
+});
+```
+
+Code này hoàn toàn hợp lệ. Với một thay đổi nhỏ và cô lập, thao tác trực tiếp như `textContent` còn có thể ít công việc hơn việc render cả component React.
+
+### 1.3 Vì sao đồng bộ DOM thủ công dễ phức tạp?
+
+Khó khăn xuất hiện khi cùng một state ảnh hưởng đến nhiều vùng UI, hoặc UI có điều kiện, danh sách, loading và tương tác của người dùng. Lúc đó code phải tự đảm bảo mọi node vẫn khớp với state hiện tại.
+
+Ví dụ, khi `isSaving` đổi, ứng dụng có thể phải đồng thời đổi text button, thuộc tính `disabled`, spinner và thông báo lỗi. Nếu mỗi nhánh code tự sửa DOM, bạn phải nhớ cập nhật tất cả nơi liên quan và dọn node cũ đúng lúc.
+
+```text
+State thay đổi
+     │
+     ├── button: text + disabled
+     ├── spinner: thêm hoặc xoá
+     └── thông báo: thêm, cập nhật hoặc xoá
+```
+
+Browser có thể phải tính lại style, layout hoặc paint sau một DOM mutation, tùy thuộc node và CSS bị ảnh hưởng. Tuy nhiên, kết luận đúng không phải là “mọi DOM API đều chậm”. Vấn đề lớn hơn là **tự giữ một cây UI phức tạp đồng bộ với state** rất dễ sai.
+
+Nói ngắn gọn: DOM là nơi UI thật sự tồn tại, nhưng React giúp bạn mô tả *trạng thái cuối mong muốn* thay vì tự điều phối từng mutation.
+
+---
+
+## 2. DOM thật và Virtual DOM
+
+Virtual DOM không thay thế DOM thật. Nó là một lớp mô tả nằm trong JavaScript; sau cùng `react-dom` vẫn phải dùng DOM API để giao diện xuất hiện trong browser.
+
+```text
+State của ứng dụng
+        │
+        ▼
+React Element / Fiber (bộ nhớ JavaScript)
+        │  React quyết định thay đổi cần thiết
+        ▼
+DOM thật trong browser
+        │
+        ▼
+Style → layout → paint → pixel
+```
+
+### 2.1 So sánh nhanh
+
+| | DOM thật | Virtual DOM trong cách nói về React |
+|---|---|---|
+| Bản chất | Object do browser cung cấp, ví dụ `HTMLDivElement` | Dữ liệu JavaScript mô tả UI; gồm React Element và cây nội bộ React theo nghĩa rộng |
+| Nơi tồn tại | Môi trường browser | JavaScript heap |
+| Có thể nhận focus hoặc sự kiện browser? | Có | Không; event cuối cùng gắn và được xử lý qua DOM thật |
+| Browser dùng để layout và paint? | Có | Không |
+| Ai tạo/quản lý chính? | Browser; `react-dom` cập nhật một vùng DOM | React tạo và reconciler xử lý |
+| Cập nhật trực tiếp bằng gì? | `appendChild`, `removeChild`, property, attribute… | Không dùng DOM API; React tạo element mới từ JSX và đối chiếu chúng |
+
+Virtual DOM giúp React tách hai việc: **tính UI nên là gì** và **ghi thay đổi đó vào browser như thế nào**. Nhờ vậy component có thể trả về JSX theo state, còn React lo việc tái sử dụng, thêm, xoá hoặc cập nhật DOM node phù hợp.
+
+### 2.2 React không đối chiếu JSX mới trực tiếp với DOM
+
+Câu “React so sánh Virtual DOM cũ và mới” là lối giải thích nhập môn hữu ích, nhưng thiếu một tầng quan trọng. JSX tạo **React Element**. Khi có update, reconciler ghép React Element mới với **cây Fiber hiện tại** — nơi React lưu state, hooks, danh tính và liên kết tới DOM node đã commit.
+
+```mermaid
+flowchart LR
+    A["State / props đổi"] --> B["Component trả React Element mới"]
+    B --> C["Reconciler đối chiếu với Fiber current"]
+    C --> D["Fiber WIP gắn cờ thay đổi"]
+    D --> E["react-dom commit vào DOM thật"]
+```
+
+Vì vậy, React không cần đọc toàn bộ DOM browser rồi tạo lại trang. `react-dom` nhận kết quả reconciliation và thực hiện mutation ở pha commit. Chi tiết của React Element, Fiber và quá trình đó bắt đầu ở phần tiếp theo.
+
+---
+
+## 3. Virtual DOM là gì
 
 Virtual DOM là một **biểu diễn nhẹ của UI trong bộ nhớ JavaScript**. Nó mô tả những gì giao diện **nên** có: loại phần tử, props và các phần tử con.
 
@@ -110,7 +246,7 @@ Object trên **không phải DOM node**:
 - Không thể nhận focus.
 - Chỉ là dữ liệu để React biết UI mong muốn trông như thế nào.
 
-### 1.1 Bốn khái niệm dễ bị trộn lẫn
+### 3.1 Bốn khái niệm dễ bị trộn lẫn
 
 | Khái niệm | Là gì | Tồn tại ở đâu | Vai trò |
 |---|---|---|---|
@@ -129,7 +265,7 @@ Virtual DOM thường ám chỉ hai tầng đầu ở giữa: mô tả React Ele
 
 ---
 
-## 2. JSX trở thành dữ liệu JavaScript
+## 4. JSX trở thành dữ liệu JavaScript
 
 JSX không phải HTML và browser không hiểu JSX trực tiếp. Trình biên dịch như Babel hoặc SWC biến JSX thành lời gọi JavaScript.
 
@@ -164,11 +300,11 @@ flowchart LR
 
 ---
 
-## 3. Toàn bộ pipeline từ state đến pixel
+## 5. Toàn bộ pipeline từ state đến pixel
 
 Virtual DOM chỉ là một phần của pipeline. Toàn bộ quá trình gồm render, reconciliation, commit và browser paint.
 
-### 3.1 Lần render đầu tiên
+### 5.1 Lần render đầu tiên
 
 ```tsx
 import { createRoot } from 'react-dom/client';
@@ -206,7 +342,7 @@ root.render(<App />);
   </Step>
 </Steps>
 
-### 3.2 Những lần cập nhật sau
+### 5.2 Những lần cập nhật sau
 
 Khi `setState` được gọi, React không sửa DOM ngay tại dòng đó. React xếp lịch một update.
 
@@ -232,7 +368,7 @@ React có thể gộp nhiều update vào một lần render. Trong concurrent r
 
 ---
 
-## 4. Reconciliation so sánh cây như thế nào
+## 6. Reconciliation so sánh cây như thế nào
 
 **Reconciliation** là quá trình React ghép mô tả UI mới với cây hiện tại để quyết định node nào được giữ, node nào cập nhật và node nào bị thay thế.
 
@@ -242,7 +378,7 @@ So sánh cây tổng quát để tìm số thao tác tuyệt đối ít nhất l
 2. `key` giúp xác định danh tính của phần tử giữa các sibling.
 3. Khi không có key, vị trí trong danh sách được dùng để ghép phần tử.
 
-### 4.1 Cùng type thì tái sử dụng
+### 6.1 Cùng type thì tái sử dụng
 
 ```tsx
 // Trước
@@ -256,7 +392,7 @@ Hai element đều có `type === 'button'`. React giữ lại cùng `HTMLButtonE
 
 Điều này giúp giữ những trạng thái thuộc DOM node như focus hoặc selection khi cấu trúc vẫn tương thích.
 
-### 4.2 Khác type thì thay cả nhánh
+### 6.2 Khác type thì thay cả nhánh
 
 ```tsx
 // Trước
@@ -276,7 +412,7 @@ Quy tắc tương tự áp dụng cho component:
 
 `Viewer` và `Editor` là hai type khác nhau. Đổi mode nghĩa là unmount type cũ và mount type mới ở vị trí đó.
 
-### 4.3 Key xác định danh tính trong danh sách
+### 6.3 Key xác định danh tính trong danh sách
 
 Xét danh sách ban đầu:
 
@@ -316,7 +452,7 @@ flowchart LR
   Dùng index làm key cho danh sách có thể thêm, xoá hoặc sắp xếp lại khiến state “nhảy” sang item khác. Key cần ổn định và duy nhất giữa các sibling. Xem phân tích chi tiết tại [Vì sao list cần key](/react-internals/key-trong-list/).
 </Callout>
 
-### 4.4 Props và text được đối chiếu riêng
+### 6.4 Props và text được đối chiếu riêng
 
 Khi host element có cùng type, renderer đối chiếu props cũ và mới để tạo update cần thiết.
 
@@ -333,7 +469,7 @@ Tên hàm và cách tối ưu cụ thể là implementation detail, có thể đ
 
 ---
 
-## 5. Ví dụ từng bước với Counter
+## 7. Ví dụ từng bước với Counter
 
 Dùng component đơn giản sau:
 
@@ -402,7 +538,7 @@ flowchart TD
 
 ---
 
-## 6. Commit thay đổi DOM thật ra sao
+## 8. Commit thay đổi DOM thật ra sao
 
 Sau reconciliation, Fiber có thể mang các cờ mô tả công việc:
 
@@ -434,7 +570,7 @@ Xem thứ tự chi tiết tại [Render Pipeline: Trigger → Render → Commit]
 
 ---
 
-## 7. Virtual DOM liên quan gì đến Fiber
+## 9. Virtual DOM liên quan gì đến Fiber
 
 Câu giải thích phổ biến “React tạo Virtual DOM mới rồi so với Virtual DOM cũ” hữu ích cho người mới nhưng bỏ qua kiến trúc thật của React hiện đại.
 
@@ -462,7 +598,7 @@ Nhờ Fiber, React có thể chia công việc, đặt ưu tiên, tạm dừng h
 
 ---
 
-## 8. Vì sao re-render không đồng nghĩa với DOM update
+## 10. Vì sao re-render không đồng nghĩa với DOM update
 
 **Re-render** nghĩa là React gọi lại function component để lấy output mới. Nó không tự động có nghĩa DOM thay đổi.
 
@@ -487,7 +623,7 @@ Re-render thừa vẫn có thể tốn CPU vì component và reconciliation ph�
 
 ---
 
-## 9. Virtual DOM có luôn nhanh hơn DOM thật không
+## 11. Virtual DOM có luôn nhanh hơn DOM thật không
 
 Không. Câu “Virtual DOM nhanh hơn DOM” thiếu chính xác vì Virtual DOM cuối cùng vẫn phải dùng DOM thật để hiển thị UI. Nó còn thêm chi phí tạo object, chạy component và reconciliation.
 
@@ -516,7 +652,7 @@ Giá trị của Virtual DOM nằm ở **mô hình lập trình và khả năng 
 
 ---
 
-## 10. Virtual DOM và Shadow DOM khác nhau
+## 12. Virtual DOM và Shadow DOM khác nhau
 
 Hai khái niệm có chữ “DOM” nhưng giải quyết hai vấn đề khác nhau.
 
@@ -532,7 +668,7 @@ React có thể render **vào trong Shadow Root**, nhưng Virtual DOM không ph�
 
 ---
 
-## 11. Thí nghiệm quan sát DOM được tái sử dụng
+## 13. Thí nghiệm quan sát DOM được tái sử dụng
 
 Ví dụ sau re-render mỗi giây. Bạn có thể nhập text vào `<input>` và quan sát nội dung vẫn còn dù `Clock` liên tục chạy lại.
 
@@ -574,7 +710,7 @@ Sau đó thử đổi JSX có điều kiện từ `<input />` sang `<textarea />
 
 ---
 
-## 12. Hiểu lầm thường gặp
+## 14. Hiểu lầm thường gặp
 
 <Accordions type="single">
   <Accordion title="React giữ hai bản sao đầy đủ của DOM thật?">
@@ -599,7 +735,7 @@ Sau đó thử đổi JSX có điều kiện từ `<input />` sang `<textarea />
 
 ---
 
-## 13. Câu hỏi tự kiểm tra
+## 15. Câu hỏi tự kiểm tra
 
 <Accordions type="single">
   <Accordion title="1. JSX tạo DOM node ngay lập tức đúng hay sai?">
