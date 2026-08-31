@@ -6,6 +6,7 @@
     "compound-components",
     "render-props",
     "provider-pattern",
-    "state-reducer"
+    "state-reducer",
+    "redux-toolkit"
   ]
 }
