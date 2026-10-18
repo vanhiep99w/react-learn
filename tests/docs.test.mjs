@@ -80,7 +80,7 @@ test('all migrated labels, connection endpoints, direction, notes and D2 sources
   }
 });
 
-test('strict learning descriptors parse using installed 0.9.6 and preserve adapted source', async () => {
+test('strict learning descriptors parse using installed 0.9.8 and preserve adapted source', async () => {
   for (const p of all) for (const b of blocks(p.text)) {
     if (!parsers[b.language]) continue;
     parsed.set(b.language, await parsers[b.language](b.code));
@@ -125,8 +125,8 @@ test('all 109 D2 fences render light/dark SVG with locally embedded icons', { ti
 test('pinned package, vetted icon and three-layer integration remain in sync', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
-  assert.equal(pkg.dependencies['@vanhiep99w/docs-kit'], '0.9.6');
-  assert.equal(lock.packages['node_modules/@vanhiep99w/docs-kit'].version, '0.9.6');
+  assert.equal(pkg.dependencies['@vanhiep99w/docs-kit'], '0.9.8');
+  assert.equal(lock.packages['node_modules/@vanhiep99w/docs-kit'].version, '0.9.8');
   assert.ok(!pkg.dependencies.mermaid);
   const svg = fs.readFileSync(path.join(root, 'content/docs/assets/react.svg'), 'utf8');
   assert.equal(hash(svg), 'b0a72f181b3b6093ad6814dffec060cc4e7d84cf16a41fd786cb069773512b5a');
