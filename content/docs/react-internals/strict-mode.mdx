@@ -33,6 +33,13 @@ description: "Công cụ dev-only của React: double-invoke render & effects đ
 
 Cách hoạt động chính của StrictMode là **cố tình gọi lặp lại** một số hàm (render, initializer, effect) trong dev để "ép lộ" những đoạn code không **idempotent** (chạy lại cho kết quả khác). Nếu code của bạn đúng theo mô hình `UI = f(state)` thuần khiết, double-invoke **không** làm gì hại; nếu nó làm vỡ thứ gì, đó chính là bug StrictMode muốn bạn thấy.
 
+**Nói ngắn gọn: StrictMode là bài kiểm tra độ bền, không phải cơ chế chạy app thật.** React muốn bắt sớm hai lỗi vốn rất khó thấy:
+
+1. **Render không thuần**: render một lần đã làm thay đổi thứ gì đó bên ngoài (ví dụ gọi API, tăng biến toàn cục). Gọi lại là lộ lỗi ngay.
+2. **Effect không dọn dẹp**: mở kết nối/listener/request nhưng component biến mất thì không cleanup. React thử `setup → cleanup → setup` để kiểm tra.
+
+Do đó, request xuất hiện 2 lần trong Network tab không có nghĩa React tự dưng cần dữ liệu 2 lần ở production. Đó là **hai lần chạy `useEffect` có chủ đích, chỉ trong development + StrictMode**.
+
 </Callout>
 
 ---
@@ -87,11 +94,11 @@ Trong dev + StrictMode, React **gọi thân component hai lần** mỗi lần re
 ```mermaid
 graph LR
     R["Một lần render trong dev"] --> A["Gọi component lần 1"]
-    R --> B["Gọi component lần 2 (kết quả bị bỏ)"]
-    A --> C["So sánh: hai lần có khác nhau không?"]
+    R --> B["Gọi component lần 2 (kết quả không được commit)"]
+    A --> C["Render phải không gây thay đổi bên ngoài"]
     B --> C
-    C -->|"khác → có side-effect ẩn"| D["Bug lộ ra (log đôi, state nhảy...)"]
-    C -->|"giống → thuần"| E["An toàn, không ảnh hưởng"]
+    C -->|"có side-effect"| D["Bug lộ ra (log đôi, state nhảy...)"]
+    C -->|"thuần"| E["An toàn, không ảnh hưởng"]
 ```
 
 ### 2.1 Component phải "thuần"
@@ -161,18 +168,41 @@ Nếu effect **thiếu cleanup**, double-invoke sẽ để lại "rác": 2 kết
 
 ### 3.1 Bẫy kinh điển: API gọi 2 lần
 
-Trong dev, effect fetch dữ liệu chạy 2 lần → bạn thấy request đôi trong Network tab. Đây **không** phải bug của StrictMode mà là dấu hiệu effect cần xử lý hủy/đua (race):
+Ví dụ code sau đặt `fetch` trong effect:
 
 ```tsx
-// ✅ Bỏ qua response cũ bằng cờ ignore — đúng cả khi double-invoke lẫn khi deps đổi nhanh
 useEffect(() => {
-  let ignore = false;
-  fetch(`/api/users/${id}`)
-    .then((r) => r.json())
-    .then((data) => { if (!ignore) setUser(data); });
-  return () => { ignore = true; };
+  fetch(`/api/users/${id}`).then(/* ... */);
 }, [id]);
 ```
+
+Khi **lần đầu mount** ở dev + StrictMode, React cố ý chạy đúng chuỗi này:
+
+```text
+setup lần 1  →  fetch #1 được gửi
+cleanup      →  component giả lập bị gỡ
+setup lần 2  →  fetch #2 được gửi
+```
+
+Vì `fetch()` là lệnh gửi request thật, cả hai request có thể tới server. Cleanup **không thể rút lại** request đã tới server; nó chỉ hủy request còn đang chờ và, quan trọng hơn, ngăn response cũ cập nhật state. Đây **không** phải bug của StrictMode: nó buộc effect phải xử lý hủy/đua (race), giống lúc `id` đổi nhanh hoặc người dùng rời màn hình.
+
+```tsx
+// ✅ Hủy request cũ; chỉ response của effect còn hiệu lực mới được dùng.
+useEffect(() => {
+  const controller = new AbortController();
+
+  fetch(`/api/users/${id}`, { signal: controller.signal })
+    .then((r) => r.json())
+    .then((data) => setUser(data))
+    .catch((error) => {
+      if (error.name !== 'AbortError') throw error;
+    });
+
+  return () => controller.abort();
+}, [id]);
+```
+
+Nếu endpoint có side-effect (ví dụ `POST /orders`, gửi email, analytics), **đừng gọi nó trong effect để “chạy một lần”**. Hãy gọi trong event handler (`onSubmit`, `onClick`) hoặc dùng idempotency key ở server. Với data fetching thật, thư viện cache sẽ dedupe request phù hợp.
 
 <Callout type="info" title="Note">
 
