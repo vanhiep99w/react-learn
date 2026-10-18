@@ -3,7 +3,9 @@ title: "Render Props & HOC"
 description: "Hai pattern chia sẻ logic thời tiền-hook — render prop & children-as-function, HOC và quy tắc viết đúng, wrapper hell, vì sao custom hook thay thế, lưu ý performance, và khi nào vẫn cần"
 ---
 
-# Render Props & HOC
+<span id="render-props--hoc" />
+
+**Render Props & HOC**
 
 ## Mục lục
 
@@ -170,10 +172,19 @@ Cả render props lồng nhau lẫn HOC chồng nhau đều tạo ra **cây bọ
 export default withAuth(withTheme(withData(withRouter(Page))));
 ```
 
-```mermaid
-graph TD
-    A["withAuth"] --> B["withTheme"] --> C["withData"] --> D["withRouter"] --> E["Page thật"]
-    E --> N["Mỗi tầng thêm 1 component vào cây<br/>→ DevTools rối, props khó truy nguồn"]
+```d2 title="4. Vấn đề: wrapper hell — sơ đồ 1"
+direction: down
+A: "withAuth"
+B: "withTheme"
+C: "withData"
+D: "withRouter"
+E: "Page thật"
+N: "Mỗi tầng thêm 1 component vào cây\n→ DevTools rối, props khó truy nguồn"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> N
 ```
 
 ---

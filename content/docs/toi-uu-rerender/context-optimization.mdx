@@ -3,7 +3,9 @@ title: "Tối ưu Context"
 description: "Vì sao Context đổi giá trị làm cả cây re-render — cơ chế lan truyền qua fiber, vì sao memo không chặn được, ổn định value, tách state/dispatch, selector với useSyncExternalStore, và khi nào dùng thư viện state"
 ---
 
-# Tối ưu Context
+<span id="tối-ưu-context" />
+
+**Tối ưu Context**
 
 ## Mục lục
 
@@ -34,12 +36,17 @@ Khác với props (chỉ ảnh hưởng cây con của cha render), Context valu
 
 ## 1. Cơ chế re-render của Context
 
-```mermaid
-graph TD
-    P["Provider value đổi (Object.is khác)"] --> C1["Consumer A render"]
-    P --> C2["Consumer B render"]
-    P --> C3["Consumer C render"]
-    P --> N["Mọi component gọi useContext đều render,<br/>kể cả có memo ở giữa"]
+```d2 title="1. Cơ chế re-render của Context — sơ đồ 1"
+direction: down
+P: "Provider value đổi (Object.is khác)"
+C1: "Consumer A render"
+C2: "Consumer B render"
+C3: "Consumer C render"
+N: "Mọi component gọi useContext đều render,\nkể cả có memo ở giữa"
+P -> C1
+P -> C2
+P -> C3
+P -> N
 ```
 
 React so sánh context value cũ vs mới bằng `Object.is`. Khác → mọi consumer render. Khi Provider nhận `value` mới, React **duyệt cây fiber** tìm tất cả fiber đang đọc context đó (`dependencies` của fiber) và đánh dấu chúng cần render — bất kể chúng nằm sâu bao nhiêu tầng.
@@ -155,10 +162,13 @@ function AddButton() {
 }
 ```
 
-```mermaid
-graph TD
-    S["State đổi"] --> A["Consumer của StateContext render"]
-    S -.->|"KHÔNG ảnh hưởng"| B["Consumer của DispatchContext (dispatch ổn định)"]
+```d2 title="4. Kỹ thuật: tách state và dispatch — sơ đồ 2"
+direction: down
+S: "State đổi"
+A: "Consumer của StateContext render"
+B: "Consumer của DispatchContext (dispatch ổn định)"
+S -> A
+S -> B: "KHÔNG ảnh hưởng" {style.stroke-dash: 3}
 ```
 
 <Callout type="info" title="Tip">

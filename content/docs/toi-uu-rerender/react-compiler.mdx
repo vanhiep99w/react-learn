@@ -3,7 +3,9 @@ title: "React Compiler"
 description: "Trình biên dịch tự động memo hóa (React Forget): thay memo/useMemo/useCallback thủ công, cách nó phân tích dependency ở build time và chèn cache _c, phụ thuộc Rules of React, cài đặt Babel/Next, directive use no memo, và cách kiểm chứng nó hoạt động"
 ---
 
-# React Compiler
+<span id="react-compiler" />
+
+**React Compiler**
 
 ## Mục lục
 
@@ -35,11 +37,15 @@ description: "Trình biên dịch tự động memo hóa (React Forget): thay me
 
 **React Compiler** (trước đây có tên *React Forget*) là một trình biên dịch chạy ở **build time**, tự động chèn memo hóa vào code React của bạn — thay thế phần lớn việc dùng `React.memo`, `useMemo`, `useCallback` bằng tay.
 
-```mermaid
-graph LR
-    A["Code bạn viết<br/>(không memo thủ công)"] --> B["React Compiler<br/>(build time, dựa trên Babel)"]
-    B --> C["Code đã tự memo hóa<br/>(chèn cache _c chi tiết)"]
-    C --> D["Runtime: bỏ qua tính lại<br/>khi input không đổi"]
+```d2 title="Tổng quan — sơ đồ 1"
+direction: right
+A: "Code bạn viết\n(không memo thủ công)"
+B: "React Compiler\n(build time, dựa trên Babel)" {icon: "../assets/react.svg"}
+C: "Code đã tự memo hóa\n(chèn cache _c chi tiết)"
+D: "Runtime: bỏ qua tính lại\nkhi input không đổi"
+A -> B
+B -> C
+C -> D
 ```
 
 <Callout type="info" title="Important">
@@ -77,11 +83,15 @@ Compiler đọc từng component/hook, dựng **đồ thị phụ thuộc (depen
 - Memo hóa **hàm** truyền xuống con (thay `useCallback`).
 - Memo hóa **JSX element** để bỏ qua re-render con khi props không đổi (thay `React.memo`).
 
-```mermaid
-graph TD
-    Comp["Phân tích component"] --> Dep["Dựng dependency graph:<br/>output nào phụ thuộc input nào"]
-    Dep --> Cache["Chèn cache theo slot:<br/>chỉ tính lại phần có input đổi"]
-    Cache --> Fine["Memo hóa CHI TIẾT hơn tay<br/>(từng biểu thức, từng JSX)"]
+```d2 title="2. React Compiler làm gì — sơ đồ 2"
+direction: down
+Comp: "Phân tích component"
+Dep: "Dựng dependency graph:\noutput nào phụ thuộc input nào"
+Cache: "Chèn cache theo slot:\nchỉ tính lại phần có input đổi"
+Fine: "Memo hóa CHI TIẾT hơn tay\n(từng biểu thức, từng JSX)"
+Comp -> Dep
+Dep -> Cache
+Cache -> Fine
 ```
 
 <Callout type="info" title="Important">
@@ -139,14 +149,21 @@ Phần này là **mô hình khái niệm về cách React Compiler hoạt độn
 
 React Compiler không chỉ "tìm `useMemo` để chèn tự động". Nó làm việc giống một trình biên dịch tối ưu: chuyển JavaScript/JSX thành một **IR nội bộ** (thường được mô tả là **HIR — High-level Intermediate Representation**), chuẩn hóa dữ liệu để dễ phân tích, chạy nhiều pass kiểm tra an toàn, rồi mới sinh JavaScript trở lại.
 
-```mermaid
-graph LR
-    A["JS/JSX source"] --> B["Lowering → HIR<br/>(CFG + biểu diễn dễ phân tích)"]
-    B --> C["Chuẩn hoá SSA<br/>(mỗi giá trị gán một lần)"]
-    C --> D["Data flow / mutability / aliasing"]
-    D --> E["Xác định reactive scopes"]
-    E --> F["Sinh memo hóa<br/>(_c / useMemoCache)"]
-    F --> G["Codegen JS/JSX đã tối ưu"]
+```d2 title="4. Pipeline biên dịch nhiều pha — sơ đồ 3"
+direction: right
+A: "JS/JSX source"
+B: "Lowering → HIR\n(CFG + biểu diễn dễ phân tích)"
+C: "Chuẩn hoá SSA\n(mỗi giá trị gán một lần)"
+D: "Data flow / mutability / aliasing"
+E: "Xác định reactive scopes"
+F: "Sinh memo hóa\n(_c / useMemoCache)"
+G: "Codegen JS/JSX đã tối ưu"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
+F -> G
 ```
 
 | Giai đoạn | Compiler cần biết gì | Kết quả |
@@ -173,13 +190,19 @@ graph LR
 - **Body**: các phép tính thuần cần chạy lại khi input đổi.
 - **Outputs**: giá trị/hàm/JSX được dùng ở phần còn lại của render.
 
-```mermaid
-graph TD
-    P["props.user.name"] --> S1["Reactive scope A<br/>greeting + JSX title"]
-    S["state.filter"] --> S2["Reactive scope B<br/>visibleItems"]
-    I["props.items"] --> S2
-    S1 --> R["return tree"]
-    S2 --> R
+```d2 title="5. Reactive scopes: khối phản ứng — sơ đồ 4"
+direction: down
+P: "props.user.name"
+S1: "Reactive scope A\ngreeting + JSX title"
+S: "state.filter"
+S2: "Reactive scope B\nvisibleItems"
+I: "props.items"
+R: "return tree"
+P -> S1
+S -> S2
+I -> S2
+S1 -> R
+S2 -> R
 ```
 
 Thay vì bạn tự viết một `useMemo` lớn cho cả đoạn render, Compiler có thể chia thành nhiều scope nhỏ:
@@ -297,17 +320,17 @@ function Profile({ user }) {
 
 Cách hoạt động ở runtime:
 
-```mermaid
-sequenceDiagram
-    participant R as Render component
-    participant C as _c(n) / useMemoCache
-    participant F as Fiber hiện tại
-    R->>C: yêu cầu mảng cache n slot
-    C->>F: lấy hoặc tạo memo cache
-    F-->>C: trả về mảng $
-    C-->>R: $[0..n-1]
-    R->>R: so input từng slot bằng Object.is
-    R->>R: input đổi → tính lại; không đổi → dùng cache
+```d2 title="7. useMemoCache / _c chi tiết — sơ đồ 5"
+shape: sequence_diagram
+R: "Render component"
+C: "_c(n) / useMemoCache"
+F: "Fiber hiện tại"
+R -> C: "yêu cầu mảng cache n slot"
+C -> F: "lấy hoặc tạo memo cache"
+F -> C: "trả về mảng \$" {style.stroke-dash: 3}
+C -> R: "\$[0..n-1]" {style.stroke-dash: 3}
+R -> R: "so input từng slot bằng Object.is"
+R -> R: "input đổi → tính lại; không đổi → dùng cache"
 ```
 
 | Thành phần | Vai trò |
@@ -362,12 +385,17 @@ Khi Compiler bỏ qua một component, app vẫn chạy như trước — chỉ 
 
 Trong development, **StrictMode** có thể gọi render nhiều hơn một lần để phát hiện side effect ẩn. Cache do Compiler sinh ra phải cho kết quả nhất quán trong tình huống này: cùng input thì cùng output, render thử bị bỏ đi cũng không được làm hỏng render kế tiếp.
 
-```mermaid
-graph TD
-    A["StrictMode dev"] --> B["Render thử lần 1"]
-    B --> C["Bỏ kết quả để kiểm tra purity"]
-    C --> D["Render lại lần 2"]
-    D --> E["Commit nếu hợp lệ"]
+```d2 title="9. StrictMode, double-render và effects — sơ đồ 6"
+direction: down
+A: "StrictMode dev"
+B: "Render thử lần 1"
+C: "Bỏ kết quả để kiểm tra purity"
+D: "Render lại lần 2"
+E: "Commit nếu hợp lệ"
+A -> B
+B -> C
+C -> D
+D -> E
 ```
 
 Điều này quay lại yêu cầu cốt lõi: render phải **idempotent**. Nếu bạn ghi global, mutate ref, fetch, hoặc set state trong render, double-render sẽ làm lỗi lộ rõ hơn — và Compiler cũng khó tối ưu hơn.
@@ -424,15 +452,23 @@ Compiler chỉ loại bỏ **tính lại thừa** và **tham chiếu thừa** tr
 | Không biến component không thuần thành thuần | Sửa Rules of React và mutation |
 | Không thay thế profiling | Vẫn đo bằng React DevTools Profiler và Web Vitals |
 
-```mermaid
-graph TD
-    A["Ứng dụng chậm"] --> B{"Chậm vì render tính lại/tham chiếu thừa?"}
-    B -->|Có| C["React Compiler có thể giúp"]
-    B -->|Không| D{"Nguyên nhân khác?"}
-    D --> E["Thuật toán tồi"]
-    D --> F["DOM quá lớn"]
-    D --> G["Fetch waterfall"]
-    D --> H["Side effect nặng"]
+```d2 title="11. Giới hạn: điều Compiler KHÔNG làm — sơ đồ 7"
+direction: down
+A: "Ứng dụng chậm"
+B: "Chậm vì render tính lại/tham chiếu thừa?" {shape: diamond}
+C: "React Compiler có thể giúp" {icon: "../assets/react.svg"}
+D: "Nguyên nhân khác?" {shape: diamond}
+E: "Thuật toán tồi"
+F: "DOM quá lớn"
+G: "Fetch waterfall"
+H: "Side effect nặng"
+A -> B
+B -> C: "Có"
+B -> D: "Không"
+D -> E
+D -> F
+D -> G
+D -> H
 ```
 
 <Callout type="info" title="Important">

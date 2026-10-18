@@ -3,7 +3,9 @@ title: "useMemo & useCallback"
 description: "Nhớ kết quả tính toán và hàm giữa các lần render — cơ chế lưu trong fiber, so deps bằng Object.is, useMemo không phải bảo đảm, dependency array, stale closure, và khi nào thực sự cần"
 ---
 
-# useMemo & useCallback
+<span id="usememo--usecallback" />
+
+**useMemo & useCallback**
 
 ## Mục lục
 
@@ -120,12 +122,17 @@ const fn = useMemo(() => () => doSomething(a), [a]); // useMemo trả về 1 hà
 
 Cả hai hook lưu `[giá_trị, deps]` vào **danh sách hooks** của fiber (`memoizedState` — xem [Fiber](/react-internals/fiber-reconciliation/)). Ở mỗi lần render:
 
-```mermaid
-graph TD
-    A["Render lại, gặp useMemo/useCallback"] --> B["Lấy [valueCũ, depsCũ]<br/>từ hooks của fiber"]
-    B --> C{"So từng phần tử deps<br/>bằng Object.is"}
-    C -->|"Tất cả bằng"| D["TÁI DÙNG valueCũ<br/>(không chạy lại fn)"]
-    C -->|"Có phần tử khác"| E["Chạy fn → lưu value mới + deps mới"]
+```d2 title="4. Cơ chế: lưu ở đâu, so deps thế nào — sơ đồ 1"
+direction: down
+A: "Render lại, gặp useMemo/useCallback"
+B: "Lấy [valueCũ, depsCũ]\ntừ hooks của fiber"
+C: "So từng phần tử deps\nbằng Object.is" {shape: diamond}
+D: "TÁI DÙNG valueCũ\n(không chạy lại fn)"
+E: "Chạy fn → lưu value mới + deps mới"
+A -> B
+B -> C
+C -> D: "Tất cả bằng"
+C -> E: "Có phần tử khác"
 ```
 
 <Callout type="info" title="Note">
@@ -168,25 +175,40 @@ const calc = useMemo(() => (x: number) => x * multiplier, [multiplier]);
 
 **Cách giảm deps một cách đúng đắn:** dùng updater function để bỏ state khỏi deps.
 
-```tsx
-// ❌ phụ thuộc count → mỗi lần count đổi, hàm tạo lại
-const inc = useCallback(() => setCount(count + 1), [count]);
+Updater function nhận state từ hàng đợi, nên callback không cần đóng trên `count`. So sánh chỉ thay cách tính state tiếp theo; không phải bằng chứng rằng mọi callback đều cần memo hóa.
 
-// ✅ updater → không cần count trong deps → hàm ổn định suốt đời
-const inc = useCallback(() => setCount((c) => c + 1), []);
+```code-diff
+title: Bỏ count khỏi dependency bằng updater
+language: tsx
+before:
+  label: Đóng trên count
+  code: |-
+    // ❌ phụ thuộc count → mỗi lần count đổi, hàm tạo lại
+    const inc = useCallback(() => setCount(count + 1), [count]);
+after:
+  label: Đọc state từ hàng đợi
+  code: |-
+    // ✅ updater → không cần count trong deps → hàm ổn định suốt đời
+    const inc = useCallback(() => setCount((c) => c + 1), []);
 ```
 
 ---
 
 ## 6. Hai lý do chính đáng để dùng
 
-```mermaid
-graph TD
-    A["Có nên useMemo/useCallback?"] --> B{"Phép tính NẶNG<br/>(sort/filter/parse khối lớn)?"}
-    B -->|Có| OK1["✅ useMemo để khỏi tính lại"]
-    B -->|Không| C{"Giá trị/hàm này truyền cho<br/>memo component hoặc<br/>làm dep của effect/memo?"}
-    C -->|Có| OK2["✅ Ổn định tham chiếu"]
-    C -->|Không| NO["❌ Không cần. Bỏ đi cho gọn."]
+```d2 title="6. Hai lý do chính đáng để dùng — sơ đồ 2"
+direction: down
+A: "Có nên useMemo/useCallback?"
+B: "Phép tính NẶNG\n(sort/filter/parse khối lớn)?" {shape: diamond}
+OK1: "✅ useMemo để khỏi tính lại"
+C: "Giá trị/hàm này truyền cho\nmemo component hoặc\nlàm dep của effect/memo?" {shape: diamond}
+OK2: "✅ Ổn định tham chiếu"
+NO: "❌ Không cần. Bỏ đi cho gọn."
+A -> B
+B -> OK1: "Có"
+B -> C: "Không"
+C -> OK2: "Có"
+C -> NO: "Không"
 ```
 
 ---

@@ -76,14 +76,21 @@ Redux không phải mặc định cho mọi state:
 
 Luồng Redux chỉ đi theo một hướng. Component không gán trực tiếp `state.cart.items`; nó dispatch một action như `cart/addItem`. Reducer nhận state hiện tại cùng action và tạo state kế tiếp. Sau đó React-Redux chạy selector của các component đã subscribe; component chỉ re-render nếu giá trị selector trả về thay đổi.
 
-```mermaid
-flowchart LR
-  UI["UI: click Thêm giỏ hàng"] --> D["dispatch(cartActions.addItem(product))"]
-  D --> M["Middleware\n(thunk, logging, ...)"]
-  M --> R["Reducer trong slice"]
-  R --> S[("Redux store\nstate mới")]
-  S --> SEL["useSelector(selector)"]
-  SEL --> UI2["Chỉ component có dữ liệu đổi re-render"]
+```d2 title="2. Mental model: dữ liệu đi một chiều — sơ đồ 1"
+direction: right
+UI: "UI: click Thêm giỏ hàng"
+D: "dispatch(cartActions.addItem(product))"
+M: "Middleware\n(thunk, logging, ...)"
+R: "Reducer trong slice"
+S: "Redux store\nstate mới" {shape: cylinder}
+SEL: "useSelector(selector)"
+UI2: "Chỉ component có dữ liệu đổi re-render"
+UI -> D
+D -> M
+M -> R
+R -> S
+S -> SEL
+SEL -> UI2
 ```
 
 Ba khái niệm cần nhớ:
@@ -102,8 +109,21 @@ Reducer phải là **hàm thuần**: cùng input luôn cho cùng output và khô
 
 Cài hai package: RTK chứa API Redux hiện đại; `react-redux` cung cấp `<Provider>`, `useSelector` và `useDispatch` cho React.
 
-```npm
-npm install @reduxjs/toolkit react-redux
+Chạy trong project React muốn thêm Redux Toolkit, **không phải yêu cầu cài lại site tài liệu**. Viewer chỉ mô tả lệnh và tiêu chí kiểm tra, không tự chạy lệnh hay cung cấp output đã đo.
+
+```terminal-session
+title: Cài và kiểm tra dependency Redux Toolkit
+context:
+  kind: local
+  label: Project React của bạn
+  cwd: /path/to/your-react-app
+steps:
+  - id: install
+    command: npm install @reduxjs/toolkit react-redux
+    expected: package.json và lockfile có cả hai dependency; npm không báo lỗi cài đặt.
+  - id: verify
+    command: npm ls @reduxjs/toolkit react-redux
+    expected: Cây dependency liệt kê cả hai package, không có trạng thái missing hoặc invalid.
 ```
 
 Tạo `store.ts`. `configureStore` tự gắn thunk middleware, kiểm tra serializable trong môi trường phát triển và kết nối Redux DevTools.

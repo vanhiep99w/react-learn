@@ -3,7 +3,9 @@ title: "Referential Equality"
 description: "Vì sao object/array/hàm 'phá' mọi tối ưu — mô hình bộ nhớ, Object.is khác === ở đâu, phá memo, vòng lặp useEffect, bailout state, và bốn cách giữ tham chiếu ổn định"
 ---
 
-# Referential Equality
+<span id="referential-equality" />
+
+**Referential Equality**
 
 ## Mục lục
 
@@ -56,15 +58,20 @@ x === y;            // true — cùng một địa chỉ
 
 ### 1.1 Mô hình bộ nhớ: stack vs heap
 
-```text
-  STACK (biến)            HEAP (object thật)
-  ┌──────────┐            ┌────────────────┐
-  │ x  ──────┼──────────► │ { a: 1 }  @0x01 │
-  │ y  ──────┼──────────► │ (cùng @0x01)    │
-  │ z  ──────┼───┐        └────────────────┘
-  └──────────┘   │        ┌────────────────┐
-                 └──────► │ { a: 1 }  @0x02 │  ← object KHÁC, dù nội dung giống
-                          └────────────────┘
+```d2 title="Biến khác nhau có thể trỏ cùng object"
+direction: right
+stack: "STACK (biến) — mô hình minh họa tham chiếu" {
+  x: x
+  y: y
+  z: z
+}
+heap: "HEAP (object thật)" {
+  one: "{ a: 1 } @0x01"
+  two: "{ a: 1 } @0x02 — object KHÁC, dù nội dung giống"
+}
+stack.x -> heap.one: "Tham chiếu @0x01"
+stack.y -> heap.one: "Cùng @0x01"
+stack.z -> heap.two: "Tham chiếu @0x02"
 ```
 
 - Primitive lưu **trực tiếp** giá trị trên stack → so sánh là so giá trị.
@@ -76,11 +83,15 @@ x === y;            // true — cùng một địa chỉ
 
 `Object.is` gần giống `===` (khác ở vài ca biên như `NaN`, `-0`). React dùng nó cho: so sánh state (bailout), deps của hook, và props trong `memo`.
 
-```mermaid
-graph TD
-    A["React cần biết: prop/state/dep này có đổi?"] --> B["Object.is(cũ, mới)"]
-    B -->|"primitive cùng giá trị"| C["= nhau → bỏ qua công việc ✅"]
-    B -->|"object/array/fn tạo mới"| D["≠ nhau → làm lại công việc ⚠️"]
+```d2 title="2. React so sánh bằng Object.is — sơ đồ 1"
+direction: down
+A: "React cần biết: prop/state/dep này có đổi?"
+B: "Object.is(cũ, mới)"
+C: "= nhau → bỏ qua công việc ✅"
+D: "≠ nhau → làm lại công việc ⚠️"
+A -> B
+B -> C: "primitive cùng giá trị"
+B -> D: "object/array/fn tạo mới"
 ```
 
 ### 2.1 Object.is khác === ở đâu
@@ -147,12 +158,16 @@ function Bad({ userId }: { userId: number }) {
 }
 ```
 
-```mermaid
-graph LR
-    A["render"] --> B["options là object mới"]
-    B --> C["effect thấy deps đổi → chạy"]
-    C --> D["setData → re-render"]
-    D --> A
+```d2 title="4. Bẫy useEffect chạy vô tận — sơ đồ 2"
+direction: right
+A: "render"
+B: "options là object mới"
+C: "effect thấy deps đổi → chạy"
+D: "setData → re-render"
+A -> B
+B -> C
+C -> D
+D -> A
 ```
 
 **Sửa:** đưa giá trị nguyên thủy vào deps, hoặc `useMemo` cho object:

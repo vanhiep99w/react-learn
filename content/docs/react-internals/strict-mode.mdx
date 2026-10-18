@@ -3,7 +3,9 @@ title: "Strict Mode"
 description: "Công cụ dev-only của React: double-invoke render & effects để lộ side-effect ẩn — cơ chế, vì sao mount→unmount→mount, các kiểm tra kèm theo, cách viết code idempotent và những hiểu lầm thường gặp"
 ---
 
-# Strict Mode
+<span id="strict-mode" />
+
+**Strict Mode**
 
 ## Mục lục
 
@@ -91,14 +93,20 @@ Trong dev + StrictMode, React **gọi thân component hai lần** mỗi lần re
 - Hàm updater truyền vào `setState(prev => ...)`.
 - `useMemo` / `useCallback` callback.
 
-```mermaid
-graph LR
-    R["Một lần render trong dev"] --> A["Gọi component lần 1"]
-    R --> B["Gọi component lần 2 (kết quả không được commit)"]
-    A --> C["Render phải không gây thay đổi bên ngoài"]
-    B --> C
-    C -->|"có side-effect"| D["Bug lộ ra (log đôi, state nhảy...)"]
-    C -->|"thuần"| E["An toàn, không ảnh hưởng"]
+```d2 title="2. Double-invoke render: vì sao chạy 2 lần — sơ đồ 1"
+direction: right
+R: "Một lần render trong dev"
+A: "Gọi component lần 1"
+B: "Gọi component lần 2 (kết quả không được commit)"
+C: "Render phải không gây thay đổi bên ngoài"
+D: "Bug lộ ra (log đôi, state nhảy...)"
+E: "An toàn, không ảnh hưởng"
+R -> A
+R -> B
+A -> C
+B -> C
+C -> D: "có side-effect"
+C -> E: "thuần"
 ```
 
 ### 2.1 Component phải "thuần"
@@ -141,15 +149,15 @@ Nếu thấy log của mình in đôi (một dòng mờ) trong dev — đó là 
 
 Từ React 18, StrictMode còn **chạy lại effect** ngay sau khi mount: React **mount → chạy effect → chạy cleanup → chạy effect lại**. Mục đích: kiểm tra effect của bạn có **cleanup đúng** và **chịu được việc bị chạy nhiều lần** không.
 
-```mermaid
-sequenceDiagram
-    participant R as React (dev + Strict)
-    participant C as Component
-    R->>C: Mount
-    R->>C: chạy effect (setup) — lần 1
-    R->>C: chạy cleanup — lần 1
-    R->>C: chạy effect (setup) — lần 2
-    Note over R,C: Production chỉ có: Mount → effect (1 lần)
+```d2 title="3. Double-invoke effect: mount → unmount → mount — sơ đồ 2"
+shape: sequence_diagram
+R: "React (dev + Strict)"
+C: "Component"
+R -> C: "Mount"
+R -> C: "chạy effect (setup) — lần 1"
+R -> C: "chạy cleanup — lần 1"
+R -> C: "chạy effect (setup) — lần 2"
+R."Ghi chú (R,C): Production chỉ có: Mount → effect (1 lần)"
 ```
 
 ```tsx
@@ -178,10 +186,14 @@ useEffect(() => {
 
 Khi **lần đầu mount** ở dev + StrictMode, React cố ý chạy đúng chuỗi này:
 
-```text
-setup lần 1  →  fetch #1 được gửi
-cleanup      →  component giả lập bị gỡ
-setup lần 2  →  fetch #2 được gửi
+```d2 title="StrictMode dev: thử lại effect và gửi request"
+direction: down
+setup1: "setup lần 1"
+fetch1: "fetch #1 được gửi"
+cleanup: "cleanup — component giả lập bị gỡ"
+setup2: "setup lần 2"
+fetch2: "fetch #2 được gửi"
+setup1 -> fetch1 -> cleanup -> setup2 -> fetch2
 ```
 
 Vì `fetch()` là lệnh gửi request thật, cả hai request có thể tới server. Cleanup **không thể rút lại** request đã tới server; nó chỉ hủy request còn đang chờ và, quan trọng hơn, ngăn response cũ cập nhật state. Đây **không** phải bug của StrictMode: nó buộc effect phải xử lý hủy/đua (race), giống lúc `id` đổi nhanh hoặc người dùng rời màn hình.
@@ -313,12 +325,18 @@ StrictMode **không có tác dụng gì ở production**: không double-invoke, 
 
 </Callout>
 
-```mermaid
-graph LR
-    D["Development + StrictMode"] --> D1["double-invoke render"]
-    D --> D2["double-invoke effect"]
-    D --> D3["cảnh báo deprecated"]
-    P["Production"] --> P1["chạy 1 lần, không cảnh báo, không overhead"]
+```d2 title="8. StrictMode trong production — sơ đồ 3"
+direction: right
+D: "Development + StrictMode"
+D1: "double-invoke render"
+D2: "double-invoke effect"
+D3: "cảnh báo deprecated"
+P: "Production"
+P1: "chạy 1 lần, không cảnh báo, không overhead"
+D -> D1
+D -> D2
+D -> D3
+P -> P1
 ```
 
 ---

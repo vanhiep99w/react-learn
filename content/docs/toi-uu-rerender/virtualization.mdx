@@ -3,7 +3,9 @@ title: "Virtualization (Windowing)"
 description: "Chỉ render phần tử đang hiển thị trong danh sách/bảng lớn: vì sao DOM lớn chậm, cơ chế tính visible range từ scroll offset, spacer giữ chiều cao, overscan, fixed vs dynamic height, @tanstack/react-virtual & react-window, bẫy a11y/Ctrl+F, và giải pháp CSS content-visibility"
 ---
 
-# Virtualization (Windowing)
+<span id="virtualization-windowing" />
+
+**Virtualization (Windowing)**
 
 ## Mục lục
 
@@ -38,11 +40,15 @@ description: "Chỉ render phần tử đang hiển thị trong danh sách/bản
 
 **Virtualization** (hay **windowing**) là kỹ thuật **chỉ render các phần tử đang nằm trong vùng nhìn thấy** (viewport), thay vì render toàn bộ danh sách/bảng có thể lên tới hàng nghìn/triệu dòng.
 
-```mermaid
-graph LR
-    A["10.000 dòng dữ liệu"] --> B["Virtualizer:<br/>tính dòng nào đang hiển thị"]
-    B --> C["Chỉ render ~15 dòng thấy được<br/>+ vài dòng đệm"]
-    C --> D["DOM nhẹ → cuộn mượt 60fps ✅"]
+```d2 title="Tổng quan — sơ đồ 1"
+direction: right
+A: "10.000 dòng dữ liệu"
+B: "Virtualizer:\ntính dòng nào đang hiển thị"
+C: "Chỉ render ~15 dòng thấy được\n+ vài dòng đệm"
+D: "DOM nhẹ → cuộn mượt 60fps ✅"
+A -> B
+B -> C
+C -> D
 ```
 
 <Callout type="info" title="Important">
@@ -66,12 +72,17 @@ Render thẳng 10.000 dòng tạo ra 10.000+ node DOM. Chi phí không chỉ ở
 | **Bộ nhớ** | Mỗi node tốn RAM; hàng chục nghìn node → app phình to |
 | **Mỗi lần update** | Reconciliation phải duyệt cây khổng lồ; dù có `memo`, chi phí duyệt vẫn lớn |
 
-```mermaid
-graph TD
-    A["Render 10.000 dòng"] --> B["10.000 DOM node"]
-    B --> C["Mount chậm + tốn RAM"]
-    B --> D["Layout/paint nặng"]
-    B --> E["Mỗi re-render duyệt cây lớn"]
+```d2 title="1. Vấn đề: DOM lớn giết performance — sơ đồ 2"
+direction: down
+A: "Render 10.000 dòng"
+B: "10.000 DOM node"
+C: "Mount chậm + tốn RAM"
+D: "Layout/paint nặng"
+E: "Mỗi re-render duyệt cây lớn"
+A -> B
+B -> C
+B -> D
+B -> E
 ```
 
 <Callout type="warn" title="Warning">
@@ -86,17 +97,20 @@ graph TD
 
 Virtualization dựng một **container cuộn** có chiều cao đúng bằng "nếu render hết" (để thanh cuộn đúng tỉ lệ), nhưng bên trong **chỉ đặt vài dòng đang thấy**, định vị tuyệt đối vào đúng chỗ.
 
-```text
-┌─ container cuộn (height = tổng ảo, vd 500.000px)─┐
-│  ··· phần trống phía trên (spacer) ···           │  ← chưa render
-│  ┌────────────────────────────────────────────┐  │
-│  │ dòng 148  (top: 7400px)  ← đang thấy       │  │
-│  │ dòng 149  (top: 7450px)  ← đang thấy       │  │  ← CHỈ những dòng
-│  │ dòng 150  (top: 7500px)  ← đang thấy       │  │     này có DOM
-│  │ ...                                        │  │
-│  └────────────────────────────────────────────┘  │
-│  ··· phần trống phía dưới (spacer) ···           │  ← chưa render
-└──────────────────────────────────────────────────┘
+```d2 title="Viewport trong container có chiều cao ảo"
+direction: down
+container: "Container cuộn — height = tổng ảo, ví dụ 500.000px" {
+  above: "Spacer phía trên — chưa render dòng ngoài viewport"
+  viewport: "Viewport — CHỈ những dòng này có DOM" {
+    r148: "Dòng 148 — top: 7400px"
+    r149: "Dòng 149 — top: 7450px"
+    r150: "Dòng 150 — top: 7500px"
+    more: "… các dòng còn thấy được"
+    r148 -- r149 -- r150 -- more: "Thứ tự hiển thị"
+  }
+  below: "Spacer phía dưới — chưa render dòng ngoài viewport"
+  above -- viewport -- below: "Vị trí trong container"
+}
 ```
 
 Khi user cuộn, virtualizer tính lại "dòng nào đang thấy" và thay đổi tập dòng được render — số node DOM luôn nhỏ và gần như cố định.
@@ -127,11 +141,15 @@ const totalHeight = itemCount * itemHeight;                          // 10000 * 
 const offsetY = startIndex * itemHeight;                             // 7400
 ```
 
-```mermaid
-graph LR
-    S["onScroll → scrollTop"] --> C["start = floor(scrollTop / H)"]
-    C --> R["render dòng [start .. start+visibleCount]"]
-    R --> P["translateY(start * H) để đặt đúng chỗ"]
+```d2 title="3.1 Tính visible range từ scroll offset — sơ đồ 3"
+direction: right
+S: "onScroll → scrollTop"
+C: "start = floor(scrollTop / H)"
+R: "render dòng [start .. start+visibleCount]"
+P: "translateY(start * H) để đặt đúng chỗ"
+S -> C
+C -> R
+R -> P
 ```
 
 <Callout type="info" title="Note">
@@ -167,12 +185,17 @@ Overscan quá nhỏ → chớp trắng khi cuộn nhanh. Overscan quá lớn →
 
 Với chiều cao động, virtualizer thường: (1) dùng một **ước lượng** ban đầu (`estimateSize`), (2) **đo thật** khi dòng render (qua `ResizeObserver`/ref), (3) **hiệu chỉnh** tổng chiều cao và vị trí dần.
 
-```mermaid
-graph TD
-    A["Dòng chưa render:<br/>dùng estimateSize"] --> B["Dòng render ra"]
-    B --> C["Đo chiều cao thật (ResizeObserver)"]
-    C --> D["Cập nhật offset tích lũy + tổng chiều cao"]
-    D --> E["Thanh cuộn & vị trí chính xác dần"]
+```d2 title="4. Chiều cao cố định vs động — sơ đồ 4"
+direction: down
+A: "Dòng chưa render:\ndùng estimateSize"
+B: "Dòng render ra"
+C: "Đo chiều cao thật (ResizeObserver)"
+D: "Cập nhật offset tích lũy + tổng chiều cao"
+E: "Thanh cuộn & vị trí chính xác dần"
+A -> B
+B -> C
+C -> D
+D -> E
 ```
 
 <Callout type="warn" title="Warning">
@@ -197,12 +220,17 @@ const offsets = [0, 30, 80, 100, 180];
 
 Bài toán khi cuộn tới `scrollTop`: tìm dòng đầu tiên sao cho vùng của dòng đó giao với viewport. Nói cách khác, tìm index lớn nhất có `offsets[index] <= scrollTop`, rồi clamp trong `[0, itemCount - 1]`. Duyệt tuyến tính từ đầu là `O(n)` mỗi lần scroll; binary search trên `offsets` chỉ `O(log n)`.
 
-```mermaid
-graph LR
-    A["scrollTop = 7400"] --> B["offsets: prefix sum đã sort tăng dần"]
-    B --> C["binary search:<br/>offsets[i] <= scrollTop < offsets[i+1]"]
-    C --> D["startIndex = i"]
-    D --> E["render range + overscan"]
+```d2 title="5. Chiều cao động — prefix sum và binary search — sơ đồ 5"
+direction: right
+A: "scrollTop = 7400"
+B: "offsets: prefix sum đã sort tăng dần"
+C: "binary search:\noffsets[i] <= scrollTop < offsets[i+1]"
+D: "startIndex = i"
+E: "render range + overscan"
+A -> B
+B -> C
+C -> D
+D -> E
 ```
 
 ```ts
@@ -245,16 +273,16 @@ export function findStartIndex(scrollTop: number, offsets: number[]): number {
 
 Vòng đời của dynamic height thường lặp như sau: render bằng kích thước ước lượng → DOM thật xuất hiện → đo chiều cao thật → ghi vào cache → cập nhật prefix sum cho các dòng phía sau.
 
-```mermaid
-sequenceDiagram
-    participant V as Virtualizer
-    participant D as DOM row
-    participant R as ResizeObserver
-    V->>D: render row với estimateSize
-    R-->>V: báo chiều cao thật
-    V->>V: cập nhật heightCache[index]
-    V->>V: cộng delta vào offsets phía sau
-    V-->>D: render lại range nếu cần
+```d2 title="6. Vòng đo lường với ResizeObserver — sơ đồ 6"
+shape: sequence_diagram
+V: "Virtualizer"
+D: "DOM row"
+R: "ResizeObserver"
+V -> D: "render row với estimateSize"
+R -> V: "báo chiều cao thật" {style.stroke-dash: 3}
+V -> V: "cập nhật heightCache[index]"
+V -> V: "cộng delta vào offsets phía sau"
+V -> D: "render lại range nếu cần" {style.stroke-dash: 3}
 ```
 
 ```ts
@@ -480,12 +508,17 @@ function countRenderedCells(range: GridRange) {
 }
 ```
 
-```mermaid
-graph TD
-    A["scrollTop + viewportHeight"] --> R["rowStart..rowEnd"]
-    B["scrollLeft + viewportWidth"] --> C["colStart..colEnd"]
-    R --> D["render visibleRows * visibleCols cells"]
-    C --> D
+```d2 title="11. Grid / 2D virtualization — sơ đồ 7"
+direction: down
+A: "scrollTop + viewportHeight"
+R: "rowStart..rowEnd"
+B: "scrollLeft + viewportWidth"
+C: "colStart..colEnd"
+D: "render visibleRows * visibleCols cells"
+A -> R
+B -> C
+R -> D
+C -> D
 ```
 
 Thư viện thường chạy hai virtualizer độc lập: một cho rows, một cho columns. Mỗi cell được đặt tại `(row.start, col.start)` trong một canvas ảo có `totalHeight` và `totalWidth`.

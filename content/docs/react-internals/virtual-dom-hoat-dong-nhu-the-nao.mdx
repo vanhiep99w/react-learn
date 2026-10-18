@@ -68,14 +68,21 @@ button.textContent = `Đã bấm ${count} lần`;
 
 Mỗi khi `count` đổi, React chạy lại component để lấy mô tả UI mới. React đối chiếu mô tả mới với trạng thái cây hiện tại, xác định phần nào cần thay đổi, rồi giao cho `react-dom` cập nhật DOM thật.
 
-```mermaid
-graph LR
-    S["State / props / context đổi"] --> R["Render component"]
-    R --> E["React Element mới"]
-    E --> F["Reconciliation trên Fiber"]
-    F --> C["Commit các thay đổi"]
-    C --> D["DOM thật"]
-    D --> P["Browser layout và paint"]
+```d2 title="Tổng quan — sơ đồ 1"
+direction: right
+S: "State / props / context đổi"
+R: "Render component"
+E: "React Element mới"
+F: "Reconciliation trên Fiber"
+C: "Commit các thay đổi"
+D: "DOM thật"
+P: "Browser layout và paint"
+S -> R
+R -> E
+E -> F
+F -> C
+C -> D
+D -> P
 ```
 
 <Callout type="warn" title="Đừng hiểu quá sát chữ virtual DOM">
@@ -99,15 +106,19 @@ Ví dụ, từ HTML này:
 
 browser tạo một cây DOM có thể hình dung như sau:
 
-```text
-Document
-└── html
-    └── body
-        └── main#app
-            ├── h1
-            │   └── "Xin chào"
-            └── button
-                └── "Đếm"
+```d2 title="DOM: quan hệ cha và con"
+direction: down
+doc: Document
+html: html
+body: body
+main: "main#app"
+h1: h1
+hello: "\"Xin chào\""
+button: button
+count: "\"Đếm\""
+doc -> html -> body -> main
+main -> h1 -> hello
+main -> button -> count
 ```
 
 Mỗi phần tử như `<main>` hoặc `<button>` trở thành một object thật, chẳng hạn `HTMLElement` hoặc `HTMLButtonElement`. Text cũng là node thật. JavaScript có thể giữ tham chiếu tới các object này và browser dùng chúng để xử lý tương tác, focus, selection và khả năng truy cập.
@@ -151,12 +162,15 @@ Khó khăn xuất hiện khi cùng một state ảnh hưởng đến nhiều vù
 
 Ví dụ, khi `isSaving` đổi, ứng dụng có thể phải đồng thời đổi text button, thuộc tính `disabled`, spinner và thông báo lỗi. Nếu mỗi nhánh code tự sửa DOM, bạn phải nhớ cập nhật tất cả nơi liên quan và dọn node cũ đúng lúc.
 
-```text
-State thay đổi
-     │
-     ├── button: text + disabled
-     ├── spinner: thêm hoặc xoá
-     └── thông báo: thêm, cập nhật hoặc xoá
+```d2 title="Một state đổi có thể tác động nhiều phần DOM"
+direction: down
+state: "State thay đổi"
+button: "button: text + disabled"
+spinner: "spinner: thêm hoặc xoá"
+notice: "thông báo: thêm, cập nhật hoặc xoá"
+state -> button
+state -> spinner
+state -> notice
 ```
 
 Browser có thể phải tính lại style, layout hoặc paint sau một DOM mutation, tùy thuộc node và CSS bị ảnh hưởng. Tuy nhiên, kết luận đúng không phải là “mọi DOM API đều chậm”. Vấn đề lớn hơn là **tự giữ một cây UI phức tạp đồng bộ với state** rất dễ sai.
@@ -169,17 +183,15 @@ Nói ngắn gọn: DOM là nơi UI thật sự tồn tại, nhưng React giúp b
 
 Virtual DOM không thay thế DOM thật. Nó là một lớp mô tả nằm trong JavaScript; sau cùng `react-dom` vẫn phải dùng DOM API để giao diện xuất hiện trong browser.
 
-```text
-State của ứng dụng
-        │
-        ▼
-React Element / Fiber (bộ nhớ JavaScript)
-        │  React quyết định thay đổi cần thiết
-        ▼
-DOM thật trong browser
-        │
-        ▼
-Style → layout → paint → pixel
+```d2 title="Từ state đến pixel trong browser"
+direction: down
+state: "State của ứng dụng"
+memory: "React Element / Fiber (bộ nhớ JavaScript)"
+dom: "DOM thật trong browser"
+pixels: "Style → layout → paint → pixel"
+state -> memory
+memory -> dom: "React quyết định thay đổi cần thiết"
+dom -> pixels
 ```
 
 ### 2.1 So sánh nhanh
@@ -199,12 +211,17 @@ Virtual DOM giúp React tách hai việc: **tính UI nên là gì** và **ghi th
 
 Câu “React so sánh Virtual DOM cũ và mới” là lối giải thích nhập môn hữu ích, nhưng thiếu một tầng quan trọng. JSX tạo **React Element**. Khi có update, reconciler ghép React Element mới với **cây Fiber hiện tại** — nơi React lưu state, hooks, danh tính và liên kết tới DOM node đã commit.
 
-```mermaid
-flowchart LR
-    A["State / props đổi"] --> B["Component trả React Element mới"]
-    B --> C["Reconciler đối chiếu với Fiber current"]
-    C --> D["Fiber WIP gắn cờ thay đổi"]
-    D --> E["react-dom commit vào DOM thật"]
+```d2 title="2.2 React không đối chiếu JSX mới trực tiếp với DOM — sơ đồ 2"
+direction: right
+A: "State / props đổi"
+B: "Component trả React Element mới"
+C: "Reconciler đối chiếu với Fiber current" {icon: "../assets/react.svg"}
+D: "Fiber WIP gắn cờ thay đổi"
+E: "react-dom commit vào DOM thật" {icon: "../assets/react.svg"}
+A -> B
+B -> C
+C -> D
+D -> E
 ```
 
 Vì vậy, React không cần đọc toàn bộ DOM browser rồi tạo lại trang. `react-dom` nhận kết quả reconciliation và thực hiện mutation ở pha commit. Chi tiết của React Element, Fiber và quá trình đó bắt đầu ở phần tiếp theo.
@@ -257,8 +274,14 @@ Object trên **không phải DOM node**:
 
 Nói ngắn gọn:
 
-```text
-JSX → React Element → Fiber → DOM node → Pixel
+```d2 title="JSX không phải DOM node"
+direction: right
+jsx: JSX
+element: "React Element"
+fiber: Fiber
+dom: "DOM node"
+pixel: Pixel
+jsx -> element -> fiber -> dom -> pixel
 ```
 
 Virtual DOM thường ám chỉ hai tầng đầu ở giữa: mô tả React Element và cây nội bộ React dùng để xử lý mô tả đó.
@@ -286,12 +309,17 @@ const element = _jsx('button', {
 
 Transform cũ thường được minh hoạ bằng `React.createElement(...)`. Hai cách đều tạo ra **React Element** chứ chưa tạo `<button>` thật.
 
-```mermaid
-flowchart LR
-    A["JSX source"] -->|"Babel / SWC"| B["jsx(type, props)"]
-    B --> C["React Element object"]
-    C -->|"Reconciler xử lý"| D["Fiber"]
-    D -->|"react-dom commit"| E["HTMLButtonElement"]
+```d2 title="4. JSX trở thành dữ liệu JavaScript — sơ đồ 3"
+direction: right
+A: "JSX source"
+B: "jsx(type, props)"
+C: "React Element object"
+D: "Fiber"
+E: "HTMLButtonElement"
+A -> B: "Babel / SWC"
+B -> C
+C -> D: "Reconciler xử lý"
+D -> E: "react-dom commit"
 ```
 
 <Callout type="info" title="Function component chưa phải DOM">
@@ -346,22 +374,21 @@ root.render(<App />);
 
 Khi `setState` được gọi, React không sửa DOM ngay tại dòng đó. React xếp lịch một update.
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant C as Component
-    participant R as Reconciler
-    participant RD as react-dom
-    participant B as Browser
-
-    U->>C: click
-    C->>R: setState xếp lịch update
-    R->>C: gọi lại component
-    C-->>R: React Element mới
-    R->>R: đối chiếu với Fiber hiện tại
-    R-->>RD: flags Placement / Update / Deletion
-    RD->>B: insert / update / remove DOM
-    B->>B: layout và paint nếu cần
+```d2 title="5.2 Những lần cập nhật sau — sơ đồ 4"
+shape: sequence_diagram
+U: "User"
+C: "Component"
+R: "Reconciler"
+RD: "react-dom"
+B: "Browser"
+U -> C: "click"
+C -> R: "setState xếp lịch update"
+R -> C: "gọi lại component"
+C -> R: "React Element mới" {style.stroke-dash: 3}
+R -> R: "đối chiếu với Fiber hiện tại"
+R -> RD: "flags Placement / Update / Deletion" {style.stroke-dash: 3}
+RD -> B: "insert / update / remove DOM"
+B -> B: "layout và paint nếu cần"
 ```
 
 React có thể gộp nhiều update vào một lần render. Trong concurrent rendering, React còn có thể tạm dừng hoặc bỏ một render đang làm dở. DOM thật chỉ thay đổi khi React đã hoàn tất công việc và bước vào commit.
@@ -434,18 +461,16 @@ Sau đó đảo thứ tự:
 
 Nhờ key, React biết item `b` và `a` vẫn là các item cũ, chỉ đổi vị trí. State của từng `Todo` được gắn với đúng danh tính.
 
-```mermaid
-flowchart LR
-    subgraph Old["Cây cũ"]
-      A1["Todo key=a"]
-      B1["Todo key=b"]
-    end
-    subgraph New["Cây mới"]
-      B2["Todo key=b"]
-      A2["Todo key=a"]
-    end
-    A1 -."cùng key và type".-> A2
-    B1 -."cùng key và type".-> B2
+```d2 title="6.3 Key xác định danh tính trong danh sách — sơ đồ 5"
+direction: right
+Old: "Cây cũ" {}
+New: "Cây mới" {}
+Old.A1: "Todo key=a"
+Old.B1: "Todo key=b"
+New.B2: "Todo key=b"
+New.A2: "Todo key=a"
+Old.A1 -> New.A2: "cùng key và type" {style.stroke-dash: 3}
+Old.B1 -> New.B2: "cùng key và type" {style.stroke-dash: 3}
 ```
 
 <Callout type="warn" title="Key theo index có thể ghép sai danh tính">
@@ -492,12 +517,15 @@ function Counter() {
 
 Khi `count = 0`, mô tả UI rút gọn là:
 
-```text
-section.counter
-├── h2
-│   └── "Bộ đếm"
-└── button
-    └── "Giá trị: 0"
+```d2 title="DOM trước update: giá trị 0"
+direction: down
+section: "section.counter"
+h2: h2
+title: "\"Bộ đếm\""
+button: button
+value: "\"Giá trị: 0\""
+section -> h2 -> title
+section -> button -> value
 ```
 
 React tạo và commit các DOM node tương ứng.
@@ -506,12 +534,15 @@ React tạo và commit các DOM node tương ứng.
 
 `setCount` tạo update với `count = 1`. React gọi lại `Counter` và nhận mô tả mới:
 
-```text
-section.counter
-├── h2
-│   └── "Bộ đếm"
-└── button
-    └── "Giá trị: 1"
+```d2 title="DOM sau update: giá trị 1"
+direction: down
+section: "section.counter"
+h2: h2
+title: "\"Bộ đếm\""
+button: button
+value: "\"Giá trị: 1\""
+section -> h2 -> title
+section -> button -> value
 ```
 
 React đối chiếu theo từng vị trí:
@@ -525,13 +556,19 @@ React đối chiếu theo từng vị trí:
 
 Commit cuối cùng chỉ cần cập nhật text liên quan. React không xoá rồi dựng lại `section`, `h2` và `button`.
 
-```mermaid
-flowchart TD
-    A["setCount: 0 → 1"] --> B["Gọi lại Counter"]
-    B --> C["Element tree mới"]
-    C --> D["Đối chiếu theo type, key, vị trí"]
-    D --> E["Chỉ text khác: gắn Update flag"]
-    E --> F["Commit text mới vào button"]
+```d2 title="Sau khi click — sơ đồ 6"
+direction: down
+A: "setCount: 0 → 1"
+B: "Gọi lại Counter"
+C: "Element tree mới"
+D: "Đối chiếu theo type, key, vị trí"
+E: "Chỉ text khác: gắn Update flag"
+F: "Commit text mới vào button"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
 ```
 
 Đây là lợi ích chính của cách khai báo: component chỉ mô tả **toàn bộ UI mong muốn**, còn React chịu trách nhiệm tìm phần DOM cần thay.
@@ -576,12 +613,17 @@ Câu giải thích phổ biến “React tạo Virtual DOM mới rồi so với 
 
 Mô hình sát hơn:
 
-```mermaid
-flowchart LR
-    E["React Element mới<br/>tạo từ render"] --> W["Work-in-progress Fiber tree"]
-    C["Current Fiber tree<br/>đang phản ánh UI hiện tại"] <--> W
-    W -->|"flags"| M["Commit mutations"]
-    M --> D["DOM thật"]
+```d2 title="9. Virtual DOM liên quan gì đến Fiber — sơ đồ 7"
+direction: right
+E: "React Element mới\ntạo từ render"
+W: "Work-in-progress Fiber tree"
+C: "Current Fiber tree\nđang phản ánh UI hiện tại"
+M: "Commit mutations"
+D: "DOM thật"
+E -> W
+C <-> W
+W -> M: "flags"
+M -> D
 ```
 
 - **React Element mới** là mô tả bất biến, thường sống ngắn và được tạo lại trong render.

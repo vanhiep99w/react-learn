@@ -3,7 +3,9 @@ title: "State Reducer & useReducer"
 description: "Gom logic state phức tạp vào reducer, và state reducer pattern cho phép người dùng can thiệp transition state"
 ---
 
-# State Reducer & useReducer
+<span id="state-reducer--usereducer" />
+
+**State Reducer & useReducer**
 
 ## Mục lục
 
@@ -82,12 +84,16 @@ function Counter() {
 }
 ```
 
-```mermaid
-graph LR
-    UI["UI dispatch(action)"] --> R["reducer(state, action)"]
-    R --> N["state mới"]
-    N --> RR["React re-render với state mới"]
-    RR --> UI
+```d2 title="2. useReducer cơ bản — sơ đồ 1"
+direction: right
+UI: "UI dispatch(action)"
+R: "reducer(state, action)"
+N: "state mới"
+RR: "React re-render với state mới" {icon: "../assets/react.svg"}
+UI -> R
+R -> N
+N -> RR
+RR -> UI
 ```
 
 <Callout type="info" title="Note">
@@ -231,12 +237,17 @@ function App() {
 }
 ```
 
-```mermaid
-graph TD
-    A["UI dispatch action"] --> B["reducer của NGƯỜI DÙNG (nếu có)"]
-    B -->|"can thiệp / chặn"| C["trả state tuỳ chỉnh"]
-    B -->|"phần còn lại"| D["gọi reducer mặc định của component"]
-    D --> E["state mới"]
+```d2 title="5. State Reducer Pattern — đảo quyền điều khiển — sơ đồ 2"
+direction: down
+A: "UI dispatch action"
+B: "reducer của NGƯỜI DÙNG (nếu có)"
+C: "trả state tuỳ chỉnh"
+D: "gọi reducer mặc định của component"
+E: "state mới"
+A -> B
+B -> C: "can thiệp / chặn"
+B -> D: "phần còn lại"
+D -> E
 ```
 
 <Callout type="info" title="Important">

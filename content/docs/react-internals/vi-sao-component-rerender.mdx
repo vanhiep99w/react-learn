@@ -3,7 +3,9 @@ title: "Vì sao component re-render"
 description: "Ba nguyên nhân khiến component render lại, cơ chế snapshot & closure, hàng đợi update, batching/flushSync, context, bailout và stale closure — mổ xẻ chi tiết"
 ---
 
-# Vì sao component re-render
+<span id="vì-sao-component-re-render" />
+
+**Vì sao component re-render**
 
 ## Mục lục
 
@@ -45,11 +47,15 @@ Bài này dựa trên [Render Pipeline](/react-internals/render-pipeline/) (3 ph
 
 ## 1. Ba nguyên nhân duy nhất
 
-```mermaid
-graph TD
-    A["Component re-render khi:"] --> B["1. state của nó thay đổi<br/>(setState với giá trị MỚI)"]
-    A --> C["2. component CHA re-render<br/>(mặc định kéo theo mọi con)"]
-    A --> D["3. context nó đang đọc thay đổi<br/>(useContext)"]
+```d2 title="1. Ba nguyên nhân duy nhất — sơ đồ 1"
+direction: down
+A: "Component re-render khi:"
+B: "1. state của nó thay đổi\n(setState với giá trị MỚI)"
+C: "2. component CHA re-render\n(mặc định kéo theo mọi con)"
+D: "3. context nó đang đọc thay đổi\n(useContext)"
+A -> B
+A -> C
+A -> D
 ```
 
 <Callout type="warn" title="Props không nằm trong danh sách">
@@ -102,10 +108,14 @@ Hãy hình dung: trong suốt `handleClick`, `count` giống như một bức �
 
 Mỗi lần render, hàm component **chạy lại từ đầu**, tạo ra một bộ biến `count`, `handleClick`... **mới hoàn toàn**. `handleClick` của lần render này "đóng gói" (closure) đúng giá trị `count` của lần render đó. Vì vậy nó không thể thấy giá trị tương lai.
 
-```mermaid
-graph TD
-    R0["Render #1: count = 0"] --> H0["handleClick #1 nhớ count = 0"]
-    R1["Render #2: count = 1"] --> H1["handleClick #2 nhớ count = 1"]
+```d2 title="2.1 Vì sao state đứng yên trong một render — closure — sơ đồ 2"
+direction: down
+R0: "Render #1: count = 0"
+H0: "handleClick #1 nhớ count = 0"
+R1: "Render #2: count = 1"
+H1: "handleClick #2 nhớ count = 1"
+R0 -> H0
+R1 -> H1
 ```
 
 Mỗi render là một "vũ trụ" riêng với state, props và event handler đóng băng theo nó. Đây không phải bug — đó là mô hình tinh thần đúng của React.
@@ -159,17 +169,17 @@ function handleClick() {
 }
 ```
 
-```mermaid
-sequenceDiagram
-    participant H as handleClick
-    participant Q as Hàng đợi update
-    participant R as React
-    H->>Q: setA(1)
-    H->>Q: setB(2)
-    H->>Q: setC(3)
-    Note over H: handler chạy xong
-    Q->>R: flush 1 lần
-    R->>R: render DUY NHẤT 1 lần
+```d2 title="3. Batching — gộp nhiều setState — sơ đồ 3"
+shape: sequence_diagram
+H: "handleClick"
+Q: "Hàng đợi update"
+R: "React"
+H -> Q: "setA(1)"
+H -> Q: "setB(2)"
+H -> Q: "setC(3)"
+H."handler chạy xong"
+Q -> R: "flush 1 lần"
+R -> R: "render DUY NHẤT 1 lần"
 ```
 
 ### 3.1 React 18 batch ở mọi nơi
@@ -285,11 +295,15 @@ export default function Parent() {
 
 Mỗi lần bấm nút, `ExpensiveChild` cũng render lại dù nó chẳng dùng `count`. Đây thường là **vô hại** (render rẻ), nhưng nếu con thật sự nặng thì cần tối ưu — bằng `React.memo` hoặc bằng cách **nâng con lên làm `children`** (xem [Composition](/patterns/composition/) và [React.memo](/toi-uu-rerender/react-memo/)).
 
-```mermaid
-graph TD
-    P["Parent render (count đổi)"] --> C1["ExpensiveChild render"]
-    P --> C2["Con khác render"]
-    C1 --> G1["Cháu render"]
+```d2 title="5. Cha re-render → con re-render (mặc định) — sơ đồ 4"
+direction: down
+P: "Parent render (count đổi)"
+C1: "ExpensiveChild render"
+C2: "Con khác render"
+G1: "Cháu render"
+P -> C1
+P -> C2
+C1 -> G1
 ```
 
 <Callout type="info" title="Tip">
@@ -410,17 +424,24 @@ Ngoài bailout do "setState cùng giá trị" (proactive), React còn bailout ch
 | 3 | Context không đổi | Không có context nào component đang đọc bị thay đổi |
 | 4 | Không có update nội bộ đang chờ | Component không tự `setState` trong chu kỳ này |
 
-```mermaid
-graph TD
-    P["Cha render → React xét con"] --> Q{"Đã mount?"}
-    Q -->|"Chưa (mount lần đầu)"| R["Render bắt buộc"]
-    Q -->|"Rồi"| S{"Props đổi tham chiếu?"}
-    S -->|"Có"| R
-    S -->|"Không"| T{"Context đổi?"}
-    T -->|"Có"| R
-    T -->|"Không"| U{"Có pending update?"}
-    U -->|"Có"| R
-    U -->|"Không"| V["BAILOUT ✅ — bỏ qua render"]
+```d2 interactive title="7.1 Bốn điều kiện bailout (passive rendering) — sơ đồ 5"
+direction: down
+P: "Cha render → React xét con"
+Q: "Đã mount?" {shape: diamond}
+R: "Render bắt buộc"
+S: "Props đổi tham chiếu?" {shape: diamond}
+T: "Context đổi?" {shape: diamond}
+U: "Có pending update?" {shape: diamond}
+V: "BAILOUT ✅ — bỏ qua render"
+P -> Q
+Q -> R: "Chưa (mount lần đầu)"
+Q -> S: "Rồi"
+S -> R: "Có"
+S -> T: "Không"
+T -> R: "Có"
+T -> U: "Không"
+U -> R: "Có"
+U -> V: "Không"
 ```
 
 <Callout type="info" title="Note">

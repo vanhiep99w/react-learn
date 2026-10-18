@@ -3,7 +3,9 @@ title: "Code-splitting & lazy loading"
 description: "Chia nhỏ bundle bằng React.lazy + Suspense — cơ chế lazy/Suspense hoạt động, route vs component splitting, next/dynamic, Error Boundary, tránh waterfall & layout shift, và preload thông minh"
 ---
 
-# Code-splitting & lazy loading
+<span id="code-splitting--lazy-loading" />
+
+**Code-splitting & lazy loading**
 
 ## Mục lục
 
@@ -39,16 +41,20 @@ Re-render tối ưu CPU lúc chạy; code-splitting tối ưu byte lúc tải. M
 
 Mặc định, mọi `import` tĩnh được gộp vào một (vài) file lớn. User mở trang chủ vẫn phải tải cả code trang admin, trang thống kê, thư viện biểu đồ nặng...
 
-```mermaid
-graph LR
-    subgraph "Không split"
-    A["main.js 2.5MB<br/>(home + admin + charts + editor)"] --> B["Tải hết mới chạy"]
-    end
-    subgraph "Có split"
-    C["main.js 300KB<br/>(home)"] --> D["Hiển thị nhanh"]
-    D -.tải khi cần.-> E["admin.js"]
-    D -.tải khi cần.-> F["charts.js"]
-    end
+```d2 title="1. Vấn đề: bundle một cục — sơ đồ 1"
+direction: right
+group1: "Không split" {}
+group2: "Có split" {}
+group1.A: "main.js 2.5MB\n(home + admin + charts + editor)"
+group1.B: "Tải hết mới chạy"
+group2.C: "main.js 300KB\n(home)"
+group2.D: "Hiển thị nhanh"
+group2.E: "admin.js"
+group2.F: "charts.js"
+group1.A -> group1.B
+group2.C -> group2.D
+group2.D -> group2.E: "tải khi cần" {style.stroke-dash: 3}
+group2.D -> group2.F: "tải khi cần" {style.stroke-dash: 3}
 ```
 
 <Callout type="info" title="Tip">
@@ -94,13 +100,19 @@ Component truyền cho `lazy` phải là **default export**. Nếu là named exp
 
 `lazy` trả về một component đặc biệt. Lần đầu render, nó gọi `import()` (trả về một Promise) và **"ném" (throw) chính Promise đó**. `Suspense` cha bắt lấy Promise này, hiển thị `fallback`, và đăng ký render lại khi Promise resolve.
 
-```mermaid
-graph TD
-    A["Render <Chart/> lần đầu"] --> B["lazy gọi import('./Chart')"]
-    B --> C["throw Promise (chunk chưa có)"]
-    C --> D["Suspense cha bắt → hiện fallback"]
-    D --> E["Chunk tải xong → Promise resolve"]
-    E --> F["React render lại → Chart hiện thật"]
+```d2 title="2.1 Cơ chế: lazy & Suspense hoạt động thế nào — sơ đồ 2"
+direction: down
+A: "Render <Chart/> lần đầu"
+B: "lazy gọi import('./Chart')"
+C: "throw Promise (chunk chưa có)"
+D: "Suspense cha bắt → hiện fallback"
+E: "Chunk tải xong → Promise resolve"
+F: "React render lại → Chart hiện thật"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
 ```
 
 <Callout type="info" title="Note">
@@ -232,11 +244,60 @@ Chọn `fallback` có **kích thước gần đúng** với nội dung thật (s
 
 Nếu component lazy A bên trong lại render component lazy B, hai chunk tải **tuần tự** (A xong mới biết cần B) → chậm:
 
-```mermaid
-graph LR
-    A["tải A.js"] --> B["render A → mới biết cần B"]
-    B --> C["tải B.js"]
-    C --> D["hiện"]
+```d2 title="6. Bẫy: waterfall khi lazy lồng nhau — sơ đồ 3"
+direction: right
+A: "tải A.js"
+B: "render A → mới biết cần B"
+C: "tải B.js"
+D: "hiện"
+A -> B
+B -> C
+C -> D
+```
+
+Ví dụ thời gian dưới đây là **số liệu giả định**, chỉ để thấy khoảng chờ cộng dồn khi B chưa được phát hiện trước khi render A. Đây không phải trace hay benchmark: 120ms tải A, 20ms render A, 80ms tải B rồi 20ms render cuối, tổng 240ms. Nếu preload B song song với A, phần chờ mạng có thể chồng lên nhau; không thể suy ra mức tăng tốc thực tế từ số liệu này.
+
+```span-waterfall
+title: Lazy lồng nhau tạo khoảng chờ tuần tự
+unit: ms
+provenance:
+  kind: illustrative
+  description: Thời gian giả định để giải thích waterfall; không đo từ DevTools hay production.
+spans:
+  - id: navigation
+    name: Mở màn hình có A và B
+    service: browser
+    start: 0
+    duration: 240
+    status: ok
+  - id: chunk-a
+    parent: navigation
+    name: Tải A.js
+    service: network
+    start: 0
+    duration: 120
+    status: ok
+  - id: render-a
+    parent: navigation
+    name: Render A và phát hiện cần B
+    service: react
+    start: 120
+    duration: 20
+    status: ok
+  - id: chunk-b
+    parent: navigation
+    name: Tải B.js
+    service: network
+    start: 140
+    duration: 80
+    status: ok
+  - id: render-b
+    parent: navigation
+    name: Render B và hiển thị
+    service: react
+    start: 220
+    duration: 20
+    status: ok
 ```
 
 <Callout type="info" title="Tip">
@@ -265,14 +326,14 @@ function ReportLink() {
 }
 ```
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant B as Browser
-    U->>B: hover vào link "Báo cáo"
-    B->>B: bắt đầu tải report.js (ngầm)
-    U->>B: bấm vào link
-    B-->>U: hiển thị ngay (chunk đã có sẵn)
+```d2 title="7. Preload thông minh — sơ đồ 4"
+shape: sequence_diagram
+U: "User"
+B: "Browser"
+U -> B: "hover vào link \"Báo cáo\""
+B -> B: "bắt đầu tải report.js (ngầm)"
+U -> B: "bấm vào link"
+B -> U: "hiển thị ngay (chunk đã có sẵn)" {style.stroke-dash: 3}
 ```
 
 <Callout type="info" title="Tip">

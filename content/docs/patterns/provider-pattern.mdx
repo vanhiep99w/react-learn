@@ -3,7 +3,9 @@ title: "Provider Pattern"
 description: "Đóng gói Context thành Provider + custom hook — API sạch type-safe, nhận props khởi tạo, persistence với localStorage, lưu ý 'use client' trong Next.js, ghép nhiều provider, performance và testing"
 ---
 
-# Provider Pattern
+<span id="provider-pattern" />
+
+**Provider Pattern**
 
 ## Mục lục
 
@@ -57,15 +59,16 @@ Vấn đề:
 
 Giải pháp: **giấu** Context, chỉ export `Provider` và hook `use*`.
 
-```mermaid
-graph LR
-    subgraph "Module nội bộ (không export Context)"
-    C["ThemeContext"]
-    P["ThemeProvider — set value"]
-    H["useTheme() — đọc + ném lỗi nếu thiếu Provider"]
-    end
-    P -->|export| App
-    H -->|export| Components
+```d2 title="2. Đóng gói: Provider + custom hook — sơ đồ 1"
+direction: right
+group1: "Module nội bộ (không export Context)" {}
+group1.C: "ThemeContext"
+group1.P: "ThemeProvider — set value"
+group1.H: "useTheme() — đọc + ném lỗi nếu thiếu Provider"
+App: "App"
+Components: "Components"
+group1.P -> App: "export"
+group1.H -> Components: "export"
 ```
 
 ---

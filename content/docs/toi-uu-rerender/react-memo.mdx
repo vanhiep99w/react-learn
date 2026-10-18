@@ -3,7 +3,9 @@ title: "React.memo"
 description: "memo bỏ qua re-render khi props không đổi — cơ chế bailout, so sánh nông, cạm bẫy props tham chiếu, comparator tùy biến, memo không chặn state/context, và giải pháp children"
 ---
 
-# React.memo
+<span id="reactmemo" />
+
+**React.memo**
 
 ## Mục lục
 
@@ -37,11 +39,15 @@ description: "memo bỏ qua re-render khi props không đổi — cơ chế bail
 
 Mặc định: cha render → mọi con render (xem [Vì sao re-render](/react-internals/vi-sao-component-rerender/)). `memo` thêm một bước kiểm tra:
 
-```mermaid
-graph TD
-    P["Cha render"] --> Q{"Con bọc memo?<br/>So sánh props cũ vs mới<br/>(Object.is từng prop)"}
-    Q -->|"Mọi prop bằng nhau"| S["BỎ QUA render con ✅"]
-    Q -->|"Có prop khác"| R["Render con như thường"]
+```d2 title="1. memo làm gì — sơ đồ 1"
+direction: down
+P: "Cha render"
+Q: "Con bọc memo?\nSo sánh props cũ vs mới\n(Object.is từng prop)" {shape: diamond}
+S: "BỎ QUA render con ✅"
+R: "Render con như thường"
+P -> Q
+Q -> S: "Mọi prop bằng nhau"
+Q -> R: "Có prop khác"
 ```
 
 So sánh mặc định là **nông (shallow)**: với mỗi prop, React dùng `Object.is(propCũ, propMới)`. "Nông" nghĩa là chỉ so sánh **một tầng** — giá trị/ tham chiếu trực tiếp của từng prop, **không** đi sâu vào bên trong object.

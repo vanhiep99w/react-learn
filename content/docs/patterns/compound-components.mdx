@@ -3,7 +3,9 @@ title: "Compound Components"
 description: "Nhóm component chia sẻ state ngầm qua Context — API kiểu <Tabs><Tab/></Tabs>, controlled vs uncontrolled, cloneElement vs Context, accessibility, ưu nhược điểm và thư viện thực tế"
 ---
 
-# Compound Components
+<span id="compound-components" />
+
+**Compound Components**
 
 ## Mục lục
 
@@ -139,12 +141,17 @@ Ném lỗi rõ ràng trong `useTabs` khi dùng ngoài `<Tabs>` giúp người d�
 </Tabs>
 ```
 
-```mermaid
-graph TD
-    T["Tabs (giữ state: value)"] -->|Context| L["Tabs.List"]
-    T -->|Context| P1["Tabs.Panel"]
-    L --> Tr1["Trigger value=a (đọc & set value)"]
-    L --> Tr2["Trigger value=b"]
+```d2 title="4. Dùng và vì sao nó linh hoạt — sơ đồ 1"
+direction: down
+T: "Tabs (giữ state: value)"
+L: "Tabs.List"
+P1: "Tabs.Panel"
+Tr1: "Trigger value=a (đọc & set value)"
+Tr2: "Trigger value=b"
+T -> L: "Context"
+T -> P1: "Context"
+L -> Tr1
+L -> Tr2
 ```
 
 Người dùng **toàn quyền** về bố cục, thứ tự, nội dung mỗi mảnh; bạn chỉ quản lý logic "tab nào đang chọn". Đây là **inversion of control** ở mức cao.

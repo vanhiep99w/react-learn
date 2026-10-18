@@ -3,7 +3,9 @@ title: "Vì sao list cần key"
 description: "Key là danh tính phần tử trong reconciliation — cơ chế khớp con theo key, vì sao index làm key gây bug state/DOM, các anti-pattern, và mẹo dùng key để reset state"
 ---
 
-# Vì sao list cần key
+<span id="vì-sao-list-cần-key" />
+
+**Vì sao list cần key**
 
 ## Mục lục
 
@@ -60,12 +62,15 @@ Cảnh báo này **không phải** lỗi cú pháp — code vẫn chạy. Nhưng
 
 Hãy hình dung danh sách học sinh xếp hàng. Nếu bạn điểm danh **theo vị trí đứng** ("bạn thứ 2"), thì khi một bạn ở đầu hàng đi ra, mọi người dịch lên — "bạn thứ 2" giờ là người khác. Nếu bạn điểm danh **theo tên** (key ổn định), ai là ai vẫn đúng dù hàng có xáo trộn.
 
-```mermaid
-graph TD
-    subgraph "Khớp theo index (sai khi chèn đầu)"
-    O1["[0] An"] --> N1["[0] Bình (mới chèn)"]
-    O2["[1] Bình"] --> N2["[1] An"]
-    end
+```d2 title="2. Key giải quyết bài toán ’danh tính’ — sơ đồ 1"
+direction: down
+group1: "Khớp theo index (sai khi chèn đầu)" {}
+group1.O1: "[0] An"
+group1.N1: "[0] Bình (mới chèn)"
+group1.O2: "[1] Bình"
+group1.N2: "[1] An"
+group1.O1 -> group1.N1
+group1.O2 -> group1.N2
 ```
 
 Với `key`, React khớp `key='an'` cũ với `key='an'` mới dù chúng đổi vị trí — giữ nguyên DOM node, state nội bộ và không tạo lại thừa.
@@ -76,16 +81,25 @@ Với `key`, React khớp `key='an'` cũ với `key='an'` mới dù chúng đổ
 
 Khi reconcile một danh sách con, React không chạy thuật toán "tìm khác biệt tối thiểu" tốn kém. Nó duyệt theo quy tắc đơn giản, nhanh:
 
-```mermaid
-graph TD
-    A["Reconcile children"] --> B{"Có key?"}
-    B -->|Không| C["Khớp theo INDEX:<br/>con cũ[i] ↔ con mới[i]"]
-    B -->|Có| D["Dựng map: key cũ → fiber cũ"]
-    D --> E["Duyệt con mới theo thứ tự"]
-    E --> F{"key mới có trong map?"}
-    F -->|Có, cùng type| G["TÁI DÙNG fiber cũ<br/>(giữ state + DOM), chỉ update prop"]
-    F -->|Không| H["TẠO MỚI fiber (mount)"]
-    E --> I["Key cũ còn dư trong map<br/>→ XOÁ (unmount)"]
+```d2 title="3. React khớp con như thế nào (cơ chế) — sơ đồ 2"
+direction: down
+A: "Reconcile children"
+B: "Có key?" {shape: diamond}
+C: "Khớp theo INDEX:\ncon cũ[i] ↔ con mới[i]"
+D: "Dựng map: key cũ → fiber cũ"
+E: "Duyệt con mới theo thứ tự"
+F: "key mới có trong map?" {shape: diamond}
+G: "TÁI DÙNG fiber cũ\n(giữ state + DOM), chỉ update prop"
+H: "TẠO MỚI fiber (mount)"
+I: "Key cũ còn dư trong map\n→ XOÁ (unmount)"
+A -> B
+B -> C: "Không"
+B -> D: "Có"
+D -> E
+E -> F
+F -> G: "Có, cùng type"
+F -> H: "Không"
+E -> I
 ```
 
 Tóm tắt 3 quyết định React đưa ra cho mỗi phần tử trong danh sách mới:

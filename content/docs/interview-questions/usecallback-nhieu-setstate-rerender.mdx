@@ -96,18 +96,18 @@ Trong cả hai trường hợp, nếu hàm được gọi đồng bộ trong cù
 
 **Batching** là việc React thu thập nhiều state update trước, xử lý chúng cùng nhau, rồi render UI một lần thay vì render sau từng setter. React 18 tự động batching trong nhiều ngữ cảnh, gồm React event handler, `setTimeout`, Promise callback và native event handler.
 
-```mermaid
-sequenceDiagram
-    participant U as User click
-    participant H as Callback
-    participant R as React
-    participant C as Component
-    U->>H: handleClick()
-    H->>R: setCount(1)
-    H->>R: setName("Hiep")
-    Note over R: gom update trong cùng batch
-    R->>C: render với count=1, name="Hiep"
-    R->>C: commit một lần nếu DOM đổi
+```d2 title="2. Automatic batching: hai update đồng bộ, một lần render — sơ đồ 1"
+shape: sequence_diagram
+U: "User click"
+H: "Callback"
+R: "React"
+C: "Component"
+U -> H: "handleClick()"
+H -> R: "setCount(1)"
+H -> R: "setName(\"Hiep\")"
+R."gom update trong cùng batch"
+R -> C: "render với count=1, name=\"Hiep\""
+R -> C: "commit một lần nếu DOM đổi"
 ```
 
 ### 2.1 Hai state khác nhau
@@ -147,11 +147,14 @@ const handleClick = useCallback(() => {
 
 React vẫn xử lý trong một batch, nên thông thường có **một lần render**. Trong lần render đó, `count` là `2`.
 
-```text
-state cũ: 0
-queue:     set 1 → set 2
-state mới: 2
-render:    một lần với count = 2
+```d2 title="Hàng đợi replacement state"
+direction: right
+old: "state cũ: 0"
+set1: "queue: set 1"
+set2: "queue: set 2"
+next: "state mới: 2"
+render: "render: một lần với count = 2"
+old -> set1 -> set2 -> next -> render
 ```
 
 Setter đầu tiên không “render ra màn hình” rồi mới đến setter thứ hai. Nó chỉ là một update trong queue mà React xử lý trước khi render.
@@ -169,11 +172,14 @@ const handleClick = useCallback(() => {
 
 Nếu `count` đang là `0`, state cuối là `2`, và vẫn thường chỉ có **một lần render**.
 
-```text
-state cũ: 0
-update 1: current => current + 1  → 1
-update 2: current => current + 1  → 2
-state mới: 2
+```d2 title="Hàng đợi updater function"
+direction: right
+old: "state cũ: 0"
+update1: "update 1: current => current + 1"
+value1: "Kết quả trung gian: 1"
+update2: "update 2: current => current + 1"
+next: "state mới: 2"
+old -> update1 -> value1 -> update2 -> next
 ```
 
 Ngược lại, đoạn dùng snapshot `count` của render hiện tại không cộng hai lần:
@@ -214,13 +220,19 @@ function handleClick() {
 
 Nếu người dùng click nút hai lần, mỗi click là một **discrete event** (user event độc lập). React xử lý xong UI của click đầu trước khi xử lý click sau để UI không bị sai, vì vậy thông thường có **hai lần render** nếu mỗi lần đều làm state đổi.
 
-```mermaid
-flowchart TD
-    A[Hai lời gọi callback] --> B{Cùng một lượt xử lý đồng bộ?}
-    B -->|Có| C[React batch updates]
-    C --> D[Thường một lần render]
-    B -->|Không, hai user event riêng| E[Mỗi event tạo batch riêng]
-    E --> F[Thường hai lần render]
+```d2 title="3. Một callback bị gọi hai lần thì sao? — sơ đồ 2"
+direction: down
+A: "Hai lời gọi callback"
+B: "Cùng một lượt xử lý đồng bộ?" {shape: diamond}
+C: "React batch updates"
+D: "Thường một lần render"
+E: "Mỗi event tạo batch riêng"
+F: "Thường hai lần render"
+A -> B
+B -> C: "Có"
+C -> D
+B -> E: "Không, hai user event riêng"
+E -> F
 ```
 
 ## 4. Khi nào thành nhiều lần render?
@@ -310,14 +322,21 @@ setFilters({ category: 'all' });        // object mới → React xem là state 
 
 Một lần React gọi hàm component là **render phase**. Sau đó React so sánh cây element mới với cây trước đó. Chỉ khi tìm thấy thay đổi ở DOM host node thì React mới làm **commit**.
 
-```mermaid
-flowchart LR
-    A[setState] --> B[Schedule update]
-    B --> C[Render: gọi component]
-    C --> D[Reconciliation: so cây cũ và mới]
-    D --> E{DOM có khác?}
-    E -->|Có| F[Commit DOM]
-    E -->|Không| G[Không thay đổi DOM]
+```d2 title="6. Render không đồng nghĩa DOM đổi — sơ đồ 3"
+direction: right
+A: "setState"
+B: "Schedule update"
+C: "Render: gọi component"
+D: "Reconciliation: so cây cũ và mới"
+E: "DOM có khác?" {shape: diamond}
+F: "Commit DOM"
+G: "Không thay đổi DOM"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F: "Có"
+E -> G: "Không"
 ```
 
 Vì thế `console.log` trong component không chứng minh DOM đã thay đổi, cũng không phải công cụ tốt để đo hiệu năng. Dùng React DevTools Profiler để xem render duration và commit thực tế.

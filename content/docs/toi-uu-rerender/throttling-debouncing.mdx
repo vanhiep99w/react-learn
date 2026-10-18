@@ -40,13 +40,19 @@ Hai kỹ thuật giải quyết cùng một vấn đề nhưng mang hai trải n
 - **Debounce**: chỉ chạy khi event đã ngừng trong một khoảng thời gian. Mỗi event mới sẽ dời lịch chạy lại.
 - **Throttle**: cho phép chạy tối đa một lần trong mỗi khoảng thời gian. Event vẫn đến, nhưng các lần gọi dư bị bỏ qua hoặc được gộp lại.
 
-```mermaid
-flowchart TD
-    A[Event bắn dày đặc] --> B{Người dùng cần kết quả khi dừng thao tác?}
-    B -->|Có| C[Debounce]
-    B -->|Không, UI cần cập nhật liên tục| D[Throttle]
-    C --> E[Search, autosave, validation]
-    D --> F[Scroll, resize, pointer move]
+```d2 title="Tổng quan — sơ đồ 1"
+direction: down
+A: "Event bắn dày đặc"
+B: "Người dùng cần kết quả khi dừng thao tác?" {shape: diamond}
+C: "Debounce"
+D: "Throttle"
+E: "Search, autosave, validation"
+F: "Scroll, resize, pointer move"
+A -> B
+B -> C: "Có"
+B -> D: "Không, UI cần cập nhật liên tục"
+C -> E
+D -> F
 ```
 
 <Callout type="idea" title="Quy tắc nhớ nhanh">
@@ -87,25 +93,32 @@ Debounce đặt một timer. Khi event mới đến trước khi timer hết h�
 
 Giả sử `delay = 300ms`. Người dùng gõ `r`, `e`, `a`, `c`, `t` liên tục. Chỉ sau 300ms kể từ phím cuối cùng, hàm search mới chạy một lần với `react`.
 
-```text
-Event:       r      e      a      c      t
-Thời gian:   0ms   80ms  160ms  240ms  320ms
-Timer cũ:     ×      ×      ×      ×
-Callback:                                      search("react")
-                                           └──── sau 300ms ────┘
+```d2 title="Debounce: ký tự cuối quyết định timer"
+direction: down
+r: "r — 0ms"
+e: "e — 80ms"
+a: "a — 160ms"
+c: "c — 240ms"
+t: "t — 320ms"
+search: "search(\"react\") — 620ms"
+r -> e: "Hủy timer cũ của r"
+e -> a: "Hủy timer cũ của e"
+a -> c: "Hủy timer cũ của a"
+c -> t: "Hủy timer cũ của c"
+t -> search: "Không có event mới trong 300ms"
 ```
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant D as Debounced function
-    participant A as API
-    U->>D: gõ "r"
-    U->>D: gõ "re" (hủy timer trước)
-    U->>D: gõ "rea" (hủy timer trước)
-    U->>D: dừng gõ
-    Note over D: chờ đủ 300ms
-    D->>A: search("rea")
+```d2 title="2.1 Dòng thời gian — sơ đồ 2"
+shape: sequence_diagram
+U: "User"
+D: "Debounced function"
+A: "API"
+U -> D: "gõ \"r\""
+U -> D: "gõ \"re\" (hủy timer trước)"
+U -> D: "gõ \"rea\" (hủy timer trước)"
+U -> D: "dừng gõ"
+D."chờ đủ 300ms"
+D -> A: "search(\"rea\")"
 ```
 
 ### 2.2 Khi nào dùng debounce
@@ -131,15 +144,23 @@ Hai tùy chọn quyết định cảm giác của throttle:
 - **Leading**: chạy ngay event đầu tiên trong cửa sổ. Dùng khi phản hồi đầu tiên cần tức thì.
 - **Trailing**: sau khi cửa sổ kết thúc, chạy thêm một lần với dữ liệu event mới nhất đã bị gộp. Dùng khi trạng thái cuối cùng phải chính xác.
 
-```text
-Throttle 200ms, leading + trailing
-
-Event:     A   B   C   D         E   F
-Time:      0  60 120 180       400 460ms
-Run:       A           D         E     F
-           └─ cửa sổ 0–200 ─┘   └─ cửa sổ 400–600 ─┘
-
-B, C bị gộp; D là giá trị mới nhất khi cửa sổ đầu kết thúc.
+```d2 title="Throttle 200ms: leading và trailing"
+direction: down
+first: "Cửa sổ 0–200ms" {
+  a: "A — event 0ms, chạy ngay (leading)"
+  b: "B — event 60ms, bị gộp"
+  c: "C — event 120ms, bị gộp"
+  d: "D — event 180ms, giá trị mới nhất"
+  run: "Chạy D ở 200ms (trailing)"
+  a -> b -> c -> d -> run
+}
+second: "Cửa sổ 400–600ms" {
+  e: "E — event 400ms, chạy ngay (leading)"
+  f: "F — event 460ms, giữ giá trị mới nhất"
+  run: "Chạy F ở 600ms (trailing)"
+  e -> f -> run
+}
+first -> second: "Sau khoảng nghỉ"
 ```
 
 Nếu chỉ bật leading, callback phản hồi ngay nhưng có thể bỏ lỡ giá trị cuối. Nếu chỉ bật trailing, hành vi gần debounce hơn nhưng vẫn có thể chạy nhiều lần nếu event kéo dài lâu.

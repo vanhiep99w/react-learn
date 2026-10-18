@@ -53,24 +53,39 @@ Tuy nhiên, một update được **schedule** chưa chắc làm hàm component 
 
 Không có một câu lệnh duy nhất kiểu “props đổi thì render”. Quy trình đúng là:
 
-```mermaid
-flowchart TD
-    A["Có update hoặc root render"] --> B["React schedule công việc"]
-    B --> C{"Fiber này có thể bailout?"}
-    C -->|"Có"| D["Bỏ qua component hoặc subtree"]
-    C -->|"Không"| E["Gọi component để tạo kết quả mới"]
-    E --> F["Reconciliation: so cây mới với cây cũ"]
-    F --> G{"Có thay đổi host node?"}
-    G -->|"Không"| H["Không sửa DOM"]
-    G -->|"Có"| I["Commit thay đổi vào DOM"]
+```d2 title="React thực sự đưa ra quyết định ở đâu — sơ đồ 1"
+direction: down
+A: "Có update hoặc root render"
+B: "React schedule công việc"
+C: "Fiber này có thể bailout?" {shape: diamond}
+D: "Bỏ qua component hoặc subtree"
+E: "Gọi component để tạo kết quả mới"
+F: "Reconciliation: so cây mới với cây cũ"
+G: "Có thay đổi host node?" {shape: diamond}
+H: "Không sửa DOM"
+I: "Commit thay đổi vào DOM"
+A -> B
+B -> C
+C -> D: "Có"
+C -> E: "Không"
+E -> F
+F -> G
+G -> H: "Không"
+G -> I: "Có"
 ```
 
 React trước hết **xếp lịch công việc**. Trong render phase, React đi qua cây Fiber và quyết định node nào cần xử lý, node nào có thể bailout. Chỉ sau khi so sánh kết quả mới với kết quả cũ, React mới biết DOM có cần thay đổi hay không.
 
 Nói ngắn gọn:
 
-```text
-update → schedule → render hoặc bailout → reconciliation → commit nếu cần
+```d2 title="Tóm tắt vòng xử lý update"
+direction: right
+update: update
+schedule: schedule
+render: "render hoặc bailout"
+reconciliation: reconciliation
+commit: "commit nếu cần"
+update -> schedule -> render -> reconciliation -> commit
 ```
 
 ## Những trường hợp làm component được render

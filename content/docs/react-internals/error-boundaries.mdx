@@ -3,7 +3,9 @@ title: "Error Boundaries"
 description: "Cơ chế bắt lỗi của React: error boundary bắt gì và KHÔNG bắt gì, error thrown trong render phase, unwinding tìm boundary gần nhất, getDerivedStateFromError vs componentDidCatch, vì sao chỉ class làm được, reset & react-error-boundary, lỗi event handler/async"
 ---
 
-# Error Boundaries
+<span id="error-boundaries" />
+
+**Error Boundaries**
 
 ## Mục lục
 
@@ -38,11 +40,15 @@ description: "Cơ chế bắt lỗi của React: error boundary bắt gì và KH
 
 **Error Boundary** là một component đặc biệt **bắt lỗi JavaScript xảy ra trong cây con của nó**, ghi log, và hiển thị **UI dự phòng (fallback)** thay vì để cả app trắng màn hình.
 
-```mermaid
-graph TD
-    A["Component con throw error<br/>trong lúc render/commit"] --> B{"Có Error Boundary<br/>cha nào ở trên không?"}
-    B -->|"Có"| C["Boundary bắt lỗi → render fallback UI ✅"]
-    B -->|"Không"| D["React UNMOUNT toàn bộ cây → màn hình trắng ❌"]
+```d2 title="Tổng quan — sơ đồ 1"
+direction: down
+A: "Component con throw error\ntrong lúc render/commit"
+B: "Có Error Boundary\ncha nào ở trên không?" {shape: diamond}
+C: "Boundary bắt lỗi → render fallback UI ✅"
+D: "React UNMOUNT toàn bộ cây → màn hình trắng ❌"
+A -> B
+B -> C: "Có"
+B -> D: "Không"
 ```
 
 <Callout type="info" title="Important">
@@ -85,14 +91,20 @@ Error boundary cho phép **cô lập** lỗi: chỉ nhánh gặp sự cố hiể
 | Lỗi trong **server-side rendering** | ❌ Không | Boundary chỉ hoạt động phía client |
 | Lỗi **ngay trong chính error boundary** | ❌ Không | Phải để boundary **cấp cao hơn** bắt |
 
-```mermaid
-graph LR
-    subgraph "React BẮT được (trong lúc render/commit)"
-    R1["render()"] --> R2["constructor"] --> R3["lifecycle / effect setup"]
-    end
-    subgraph "React KHÔNG bắt (ngoài render)"
-    E1["onClick handler"] --> E2["setTimeout / Promise"] --> E3["SSR"]
-    end
+```d2 title="2. Error Boundary bắt gì và KHÔNG bắt gì — sơ đồ 2"
+direction: right
+group1: "React BẮT được (trong lúc render/commit)" {}
+group2: "React KHÔNG bắt (ngoài render)" {}
+group1.R1: "render()"
+group1.R2: "constructor"
+group1.R3: "lifecycle / effect setup"
+group2.E1: "onClick handler"
+group2.E2: "setTimeout / Promise"
+group2.E3: "SSR"
+group1.R1 -> group1.R2
+group1.R2 -> group1.R3
+group2.E1 -> group2.E2
+group2.E2 -> group2.E3
 ```
 
 <Callout type="warn" title="Warning">
@@ -107,13 +119,19 @@ Hiểu lầm phổ biến nhất: "bọc error boundary là bắt được mọi
 
 Khi một component throw trong lúc React đang gọi nó ở **render phase**, React không để lỗi lan ra ngoài như một exception JS bình thường. Thay vào đó nó **bắt lại (catch)**, rồi thực hiện **unwinding**: đi ngược lên cây fiber theo con trỏ `return` để tìm **error boundary gần nhất**.
 
-```mermaid
-graph TD
-    T["Fiber con throw trong beginWork"] --> C["React catch lỗi trong work loop"]
-    C --> U["Unwind: đi lên theo fiber.return<br/>tìm boundary gần nhất"]
-    U --> F{"Tìm thấy boundary?"}
-    F -->|"Có"| G["Đánh dấu boundary cần render lại<br/>với state lỗi → fallback"]
-    F -->|"Không"| H["Unwind tới root → unmount cả cây"]
+```d2 title="3. Cơ chế bên trong: error unwinding — sơ đồ 3"
+direction: down
+T: "Fiber con throw trong beginWork"
+C: "React catch lỗi trong work loop"
+U: "Unwind: đi lên theo fiber.return\ntìm boundary gần nhất"
+F: "Tìm thấy boundary?" {shape: diamond}
+G: "Đánh dấu boundary cần render lại\nvới state lỗi → fallback"
+H: "Unwind tới root → unmount cả cây"
+T -> C
+C -> U
+U -> F
+F -> G: "Có"
+F -> H: "Không"
 ```
 
 Điểm mấu chốt: vì lỗi xảy ra ở **render phase** (chỉ dựng cây WIP trong bộ nhớ, chưa đụng DOM), React có thể **an toàn vứt bỏ** cây WIP dang dở và render lại nhánh đó bằng fallback — người dùng không bao giờ thấy trạng thái nửa vời. Đây là lợi ích trực tiếp của việc render phase **gián đoạn/hủy được** (xem [Fiber](/react-internals/fiber-reconciliation/#6-render-pha-có-thể-gián-đoạn-concurrent--lanes)).
@@ -159,22 +177,21 @@ componentDidCatch(error: Error, info: { componentStack: string }) {
 
 Ở source của reconciler, lỗi render không được xử lý bằng `try/catch` rải rác trong từng component. React bọc **work loop** bằng một lớp xử lý lỗi trung tâm: khi `beginWork` hoặc quá trình render một fiber throw, lỗi đi qua `handleThrow`, rồi được phân loại/đẩy vào `throwException`.
 
-```mermaid
-sequenceDiagram
-    participant WL as workLoop
-    participant BW as beginWork(fiber)
-    participant HT as handleThrow
-    participant TE as throwException
-    participant EB as ErrorBoundary/HostRoot
-
-    WL->>BW: performUnitOfWork
-    BW--xWL: throw Error
-    WL->>HT: catch thrown value
-    HT->>TE: xử lý exception
-    TE->>TE: đi lên bằng fiber.return
-    TE->>EB: tìm boundary gần nhất
-    EB->>EB: enqueue captured error update
-    WL->>EB: render lại từ boundary → fallback
+```d2 title="4. Source-level: work loop bắt lỗi render như thế nào — sơ đồ 4"
+shape: sequence_diagram
+WL: "workLoop"
+BW: "beginWork(fiber)"
+HT: "handleThrow"
+TE: "throwException"
+EB: "ErrorBoundary/HostRoot"
+WL -> BW: "performUnitOfWork"
+BW -> WL: "throw Error" {target-arrowhead.shape: cross}
+WL -> HT: "catch thrown value"
+HT -> TE: "xử lý exception"
+TE -> TE: "đi lên bằng fiber.return"
+TE -> EB: "tìm boundary gần nhất"
+EB -> EB: "enqueue captured error update"
+WL -> EB: "render lại từ boundary → fallback"
 ```
 
 `throwException` đi ngược lên cây theo con trỏ `return` để tìm fiber có thể xử lý lỗi:
@@ -207,11 +224,21 @@ Không phải lỗi nào cũng đi qua cùng một đường. React phân biệt
 | **Commit phase** | Đang áp mutation/layout effect; commit không gián đoạn | Lỗi trong mutation lifecycle, `componentDidMount`, `useLayoutEffect` setup | `captureCommitPhaseError` | Tìm boundary gần nhất và schedule update lỗi sau commit hiện tại |
 | **Passive effect** | Sau paint; user có thể đã thấy UI mới | Lỗi trong `useEffect` setup/cleanup | `captureCommitPhaseError` (khi flush passive effects) | Cũng route tới boundary, nhưng xảy ra muộn hơn vì passive effects chạy sau paint |
 
-```mermaid
-graph TD
-    R["Render throw<br/>beginWork/render"] --> RTE["throwException / unwind"] --> B["Boundary fallback"]
-    C["Commit throw<br/>mutation / layout effect"] --> CCE["captureCommitPhaseError"] --> B
-    P["Passive throw<br/>useEffect sau paint"] --> PCE["captureCommitPhaseError khi flush passive"] --> B
+```d2 title="5. Ba nguồn lỗi và đường đi khác nhau — sơ đồ 5"
+direction: down
+R: "Render throw\nbeginWork/render"
+RTE: "throwException / unwind"
+B: "Boundary fallback"
+C: "Commit throw\nmutation / layout effect"
+CCE: "captureCommitPhaseError"
+P: "Passive throw\nuseEffect sau paint"
+PCE: "captureCommitPhaseError khi flush passive"
+R -> RTE
+RTE -> B
+C -> CCE
+CCE -> B
+P -> PCE
+PCE -> B
 ```
 
 <Callout type="info" title="Important">
@@ -226,13 +253,19 @@ Commit phase không thể bị hủy giữa chừng như render phase. Vì vậy
 
 Nếu `throwException` đi lên tới `HostRoot` mà không gặp class boundary, root trở thành boundary cuối cùng. React tạo `createRootErrorUpdate`: update này làm root render ra `null`, tức là **gỡ bỏ toàn bộ cây React**.
 
-```mermaid
-graph TD
-    Bug["BuggyComponent throw"] --> A["Không có boundary ở feature"]
-    A --> B["Không có boundary ở page"]
-    B --> Root["HostRoot"]
-    Root --> Null["createRootErrorUpdate → render null"]
-    Null --> White["Unmount cả cây / màn hình trắng"]
+```d2 title="6. Vì sao lỗi không có boundary lại unmount cả cây — sơ đồ 6"
+direction: down
+Bug: "BuggyComponent throw"
+A: "Không có boundary ở feature"
+B: "Không có boundary ở page"
+Root: "HostRoot"
+Null: "createRootErrorUpdate → render null"
+White: "Unmount cả cây / màn hình trắng"
+Bug -> A
+A -> B
+B -> Root
+Root -> Null
+Null -> White
 ```
 
 Đây là thay đổi lớn từ React 16. React 15 có thể để cây nội bộ bị hỏng và tiếp tục hiển thị UI sai, dẫn đến lỗi dây chuyền khó debug. React 16 chọn hành vi rõ ràng hơn: **không thể tin cây nữa thì tháo nó xuống**.
@@ -345,14 +378,21 @@ Hydration mismatch xảy ra khi HTML từ server không khớp với render phí
 
 React không coi hầu hết mismatch này là lỗi làm sập app. Nó có thể **bỏ HTML server của nhánh đó và client render lại**, rồi gọi `onRecoverableError`.
 
-```mermaid
-graph TD
-    SSR["HTML từ server"] --> H["hydrateRoot / hydration"]
-    Client["Render client"] --> H
-    H --> M{"Khớp không?"}
-    M -->|"Khớp"| Keep["Giữ DOM server, gắn listeners"]
-    M -->|"Không"| Recover["Bỏ nhánh server / client render lại"]
-    Recover --> ORE["onRecoverableError"]
+```d2 title="10. Hydration error là recoverable — sơ đồ 7"
+direction: down
+SSR: "HTML từ server"
+H: "hydrateRoot / hydration"
+Client: "Render client"
+M: "Khớp không?" {shape: diamond}
+Keep: "Giữ DOM server, gắn listeners"
+Recover: "Bỏ nhánh server / client render lại"
+ORE: "onRecoverableError"
+SSR -> H
+Client -> H
+H -> M
+M -> Keep: "Khớp"
+M -> Recover: "Không"
+Recover -> ORE
 ```
 
 Liên hệ với Error Boundary: boundary xử lý **exception trong cây React**; hydration recoverable là cơ chế phục hồi của root/renderer. Nếu mismatch dẫn tới exception thật trong render, lỗi đó vẫn đi theo đường Error Boundary như mục 4-5.
@@ -363,15 +403,21 @@ Liên hệ với Error Boundary: boundary xử lý **exception trong cây React*
 
 Boundary chỉ bắt lỗi của **cây con**, không bắt lỗi của **chính nó**. Nếu fallback của boundary cũng throw, lỗi mới sẽ được ném lên boundary cha gần nhất.
 
-```mermaid
-graph TD
-    RootBoundary["RootBoundary"] --> PageBoundary["PageBoundary"]
-    PageBoundary --> WidgetBoundary["WidgetBoundary"]
-    WidgetBoundary --> Bug["BuggyWidget throw"]
-    Bug -->|"unwind"| WidgetBoundary
-    WidgetBoundary -->|"render fallback"| BadFallback["Fallback của WidgetBoundary throw"]
-    BadFallback -->|"re-throw / unwind tiếp"| PageBoundary
-    PageBoundary --> PageFallback["PageBoundary fallback"]
+```d2 title="11. Nested boundaries và re-throw — sơ đồ 8"
+direction: down
+RootBoundary: "RootBoundary"
+PageBoundary: "PageBoundary"
+WidgetBoundary: "WidgetBoundary"
+Bug: "BuggyWidget throw"
+BadFallback: "Fallback của WidgetBoundary throw"
+PageFallback: "PageBoundary fallback"
+RootBoundary -> PageBoundary
+PageBoundary -> WidgetBoundary
+WidgetBoundary -> Bug
+Bug -> WidgetBoundary: "unwind"
+WidgetBoundary -> BadFallback: "render fallback"
+BadFallback -> PageBoundary: "re-throw / unwind tiếp"
+PageBoundary -> PageFallback
 ```
 
 Điều này giải thích hai quy tắc thực tế:
@@ -597,12 +643,17 @@ Không có một chỗ đặt "đúng" duy nhất — chọn theo mức độ c�
 | **Bọc từng route/page** | Lỗi 1 trang không sập trang khác | App nhiều trang |
 | **Bọc từng widget độc lập** (sidebar, chart, comment) | Widget hỏng, phần còn lại vẫn dùng được | Dashboard, trang ghép nhiều khối |
 
-```mermaid
-graph TD
-    Root["ErrorBoundary gốc (lưới an toàn)"] --> Page["ErrorBoundary theo trang"]
-    Page --> W1["ErrorBoundary: Chart"]
-    Page --> W2["ErrorBoundary: Feed"]
-    Page --> W3["ErrorBoundary: Sidebar"]
+```d2 title="17. Đặt boundary ở đâu — chiến lược granularity — sơ đồ 9"
+direction: down
+Root: "ErrorBoundary gốc (lưới an toàn)"
+Page: "ErrorBoundary theo trang"
+W1: "ErrorBoundary: Chart"
+W2: "ErrorBoundary: Feed"
+W3: "ErrorBoundary: Sidebar"
+Root -> Page
+Page -> W1
+Page -> W2
+Page -> W3
 ```
 
 <Callout type="info" title="Important">

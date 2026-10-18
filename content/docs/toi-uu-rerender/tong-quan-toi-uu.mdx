@@ -3,7 +3,9 @@ title: "Tổng quan tối ưu Re-render"
 description: "Tư duy tối ưu đúng: đo trước khi sửa bằng Profiler, mô hình chi phí render vs tính toán, bốn nhóm kỹ thuật, cây quyết định, React Compiler, và các lỗi tối ưu phản tác dụng"
 ---
 
-# Tổng quan tối ưu Re-render
+<span id="tổng-quan-tối-ưu-re-render" />
+
+**Tổng quan tối ưu Re-render**
 
 ## Mục lục
 
@@ -132,12 +134,17 @@ Hai vấn đề cần hai công cụ khác nhau: **render lại quá nhiều l�
 
 ## 3. Bốn nhóm kỹ thuật
 
-```mermaid
-graph TD
-    A["Tối ưu re-render"] --> B["1. Bỏ qua render con không cần<br/>React.memo + lift children"]
-    A --> C["2. Ổn định tham chiếu<br/>useMemo / useCallback"]
-    A --> D["3. Thu hẹp phạm vi state<br/>tách Context, colocate state"]
-    A --> E["4. Giảm JS phải tải/chạy<br/>code-splitting, lazy, Suspense"]
+```d2 title="3. Bốn nhóm kỹ thuật — sơ đồ 1"
+direction: down
+A: "Tối ưu re-render"
+B: "1. Bỏ qua render con không cần\nReact.memo + lift children"
+C: "2. Ổn định tham chiếu\nuseMemo / useCallback"
+D: "3. Thu hẹp phạm vi state\ntách Context, colocate state"
+E: "4. Giảm JS phải tải/chạy\ncode-splitting, lazy, Suspense"
+A -> B
+A -> C
+A -> D
+A -> E
 ```
 
 Mỗi nhóm có bài riêng:
@@ -174,15 +181,23 @@ Hai cách rẻ nhất và nên thử **trước** mọi `memo`: (1) **đưa stat
 
 ## 5. Cây quyết định: nên dùng gì
 
-```mermaid
-graph TD
-    Q1{"Profiler báo component<br/>này render chậm?"} -->|Không| X["Đừng tối ưu. Dừng lại."]
-    Q1 -->|Có| Q2{"Chậm vì TÍNH TOÁN<br/>nặng trong render?"}
-    Q2 -->|Có| M1["Bọc phép tính bằng useMemo"]
-    Q2 -->|Không| Q3{"Chậm vì render LẠI<br/>quá nhiều lần?"}
-    Q3 -->|"Cha kéo con nặng"| M2["React.memo cho con<br/>+ ổn định props bằng useMemo/useCallback<br/>hoặc lift con thành children"]
-    Q3 -->|"Context đổi kéo cả cây"| M3["Tách Context / dùng selector"]
-    Q3 -->|"State đặt quá cao"| M4["Đưa state xuống gần nơi dùng<br/>(colocation)"]
+```d2 title="5. Cây quyết định: nên dùng gì — sơ đồ 2"
+direction: down
+Q1: "Profiler báo component\nnày render chậm?" {shape: diamond}
+X: "Đừng tối ưu. Dừng lại."
+Q2: "Chậm vì TÍNH TOÁN\nnặng trong render?" {shape: diamond}
+M1: "Bọc phép tính bằng useMemo"
+Q3: "Chậm vì render LẠI\nquá nhiều lần?" {shape: diamond}
+M2: "React.memo cho con\n+ ổn định props bằng useMemo/useCallback\nhoặc lift con thành children"
+M3: "Tách Context / dùng selector"
+M4: "Đưa state xuống gần nơi dùng\n(colocation)"
+Q1 -> X: "Không"
+Q1 -> Q2: "Có"
+Q2 -> M1: "Có"
+Q2 -> Q3: "Không"
+Q3 -> M2: "Cha kéo con nặng"
+Q3 -> M3: "Context đổi kéo cả cây"
+Q3 -> M4: "State đặt quá cao"
 ```
 
 ---
@@ -191,10 +206,13 @@ graph TD
 
 Từ React 19, **React Compiler** (trước đây gọi là "React Forget") có thể **tự động** chèn memoization lúc biên dịch — về lý thuyết khiến `useMemo`/`useCallback`/`memo` thủ công phần lớn không còn cần thiết.
 
-```mermaid
-graph LR
-    A["Code không memo"] --> B["React Compiler<br/>(build time)"]
-    B --> C["Code đã chèn memo<br/>tự động"]
+```d2 title="6. React Compiler thay đổi gì — sơ đồ 3"
+direction: right
+A: "Code không memo"
+B: "React Compiler\n(build time)" {icon: "../assets/react.svg"}
+C: "Code đã chèn memo\ntự động"
+A -> B
+B -> C
 ```
 
 <Callout type="info" title="Note">

@@ -67,13 +67,19 @@ useEffect(() => {
 
 Effect đọc `query` và `results.length`. Khi một trong hai thay đổi, tiêu đề trang phải được đồng bộ lại. Những giá trị không được đọc không nên xuất hiện chỉ vì chúng có trong component.
 
-```mermaid
-flowchart LR
-  R["Component render"] --> D["Tạo callback + dependency array mới"]
-  D --> C{"So từng dependency\nbằng Object.is"}
-  C -->|"Có phần tử khác"| N["Giá trị cache cũ không còn hợp lệ"]
-  C -->|"Tất cả giống"| K["Tái dùng cache / không chạy lại Effect"]
-  N --> E["Effect cleanup cũ → setup mới\nhoặc memo/callback tính lại"]
+```d2 title="Dependency array là gì? — sơ đồ 1"
+direction: right
+R: "Component render"
+D: "Tạo callback + dependency array mới"
+C: "So từng dependency\nbằng Object.is" {shape: diamond}
+N: "Giá trị cache cũ không còn hợp lệ"
+K: "Tái dùng cache / không chạy lại Effect"
+E: "Effect cleanup cũ → setup mới\nhoặc memo/callback tính lại"
+R -> D
+D -> C
+C -> N: "Có phần tử khác"
+C -> K: "Tất cả giống"
+N -> E
 ```
 
 Với Effect, callback không chạy trong render. React commit UI trước, sau đó cleanup Effect cũ (nếu cần) và chạy setup Effect mới. Với `useMemo` và `useCallback`, callback/cache được xử lý trong render để tạo giá trị cho lần render đó.
@@ -510,10 +516,12 @@ useEffect(() => {
 
 Khi `roomId` đổi, thứ tự là:
 
-```text
-commit UI với roomId mới
-→ cleanup đóng kết nối roomId cũ
-→ setup mở kết nối roomId mới
+```d2 title="Đổi roomId: cleanup trước setup mới"
+direction: down
+commit: "commit UI với roomId mới"
+cleanup: "cleanup đóng kết nối roomId cũ"
+setup: "setup mở kết nối roomId mới"
+commit -> cleanup -> setup
 ```
 
 Với fetch, callback Effect không nên là `async`, vì `useEffect` cần callback trả về `undefined` hoặc một hàm cleanup, không phải Promise. Tạo hàm async bên trong và hủy request cũ trong cleanup.

@@ -3,7 +3,9 @@ title: "Composition"
 description: "Ghép component qua children & slots thay vì kế thừa — inversion of control, slot pattern, specialization, giải prop drilling, tối ưu performance, và so sánh với HOC. Nền tảng của mọi pattern React"
 ---
 
-# Composition
+<span id="composition" />
+
+**Composition**
 
 ## Mục lục
 
@@ -214,11 +216,15 @@ export default function App() {
 }
 ```
 
-```mermaid
-graph TD
-    App["App tạo &lt;ExpensiveTree/&gt; element 1 lần"] --> CB["ColorBox (state color)"]
-    CB -->|"color đổi → ColorBox render"| Btn["nút render lại"]
-    CB -.->|"children là element CŨ → KHÔNG render lại"| ET["ExpensiveTree giữ nguyên"]
+```d2 title="5. Composition là một tối ưu performance — sơ đồ 1"
+direction: down
+App: "App tạo <ExpensiveTree/> element 1 lần"
+CB: "ColorBox (state color)"
+Btn: "nút render lại"
+ET: "ExpensiveTree giữ nguyên"
+App -> CB
+CB -> Btn: "color đổi → ColorBox render"
+CB -> ET: "children là element CŨ → KHÔNG render lại" {style.stroke-dash: 3}
 ```
 
 <Callout type="info" title="Important">

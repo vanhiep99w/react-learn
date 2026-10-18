@@ -3,7 +3,9 @@ title: "Giới thiệu"
 description: "Blog học React nâng cao — internals, tối ưu re-render và design patterns, giải thích siêu chi tiết bằng tiếng Việt"
 ---
 
-# React Nâng Cao — Hiểu Sâu Để Viết Tốt
+<span id="react-nâng-cao--hiểu-sâu-để-viết-tốt" />
+
+**React Nâng Cao — Hiểu Sâu Để Viết Tốt**
 
 ## Mục lục
 
@@ -46,11 +48,15 @@ Giao diện là **kết quả của một hàm thuần** áp lên state. Bạn k
 
 Từ công thức này suy ra 3 nhóm chủ đề:
 
-```mermaid
-graph LR
-    A["UI = f(state)"] --> B["1. React chạy f() như thế nào?<br/>(Internals)"]
-    A --> C["2. Làm sao gọi f() ít lại<br/>khi không cần?<br/>(Tối ưu re-render)"]
-    A --> D["3. Tổ chức f() sao cho<br/>tái dùng & dễ bảo trì?<br/>(Patterns)"]
+```d2 title="Tư duy xuyên suốt — sơ đồ 1"
+direction: right
+A: "UI = f(state)"
+B: "1. React chạy f() như thế nào?\n(Internals)"
+C: "2. Làm sao gọi f() ít lại\nkhi không cần?\n(Tối ưu re-render)"
+D: "3. Tổ chức f() sao cho\ntái dùng & dễ bảo trì?\n(Patterns)"
+A -> B
+A -> C
+A -> D
 ```
 
 ---

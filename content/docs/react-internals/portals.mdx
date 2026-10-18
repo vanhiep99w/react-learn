@@ -3,7 +3,9 @@ title: "Portals"
 description: "createPortal render con ra ngoài cây DOM cha nhưng GIỮ nguyên cây React: event bubbling & context đi theo cây React chứ không theo DOM, HostPortal fiber, thoát overflow/z-index, modal/tooltip, focus trap & a11y, và bẫy SSR hydration"
 ---
 
-# Portals
+<span id="portals" />
+
+**Portals**
 
 ## Mục lục
 
@@ -37,16 +39,21 @@ description: "createPortal render con ra ngoài cây DOM cha nhưng GIỮ nguyê
 
 **Portal** cho phép render một component vào **một node DOM nằm ngoài** cây DOM của component cha — trong khi component đó vẫn là **con hợp lệ trong cây React**.
 
-```mermaid
-graph TD
-    subgraph "Cây React (logic)"
-    App --> Page --> Modal["Modal (con của Page)"]
-    end
-    subgraph "Cây DOM (thực tế)"
-    body --> root["#root → Page"]
-    body --> portalRoot["#portal-root → Modal DOM ở ĐÂY"]
-    end
-    Modal -.createPortal.-> portalRoot
+```d2 title="Tổng quan — sơ đồ 1"
+direction: down
+group1: "Cây React (logic)" {}
+group2: "Cây DOM (thực tế)" {}
+group1.App: "App"
+group1.Page: "Page"
+group1.Modal: "Modal (con của Page)"
+group2.body: "body"
+group2.root: "#root → Page"
+group2.portalRoot: "#portal-root → Modal DOM ở ĐÂY"
+group1.App -> group1.Page
+group1.Page -> group1.Modal
+group2.body -> group2.root
+group2.body -> group2.portalRoot
+group1.Modal -> group2.portalRoot: "createPortal" {style.stroke-dash: 3}
 ```
 
 <Callout type="info" title="Important">
@@ -67,10 +74,14 @@ Các UI nổi (modal, tooltip, dropdown, toast) thường bị "kẹt" bên tron
 - Cha tạo **stacking context** (có `transform`, `opacity`, `z-index`) → phần tử con **không thể** nổi lên trên các phần tử ngoài cha, dù `z-index` cao cỡ nào.
 - Cha có `position: relative` giới hạn định vị `absolute` của con.
 
-```mermaid
-graph LR
-    A["Card overflow:hidden"] --> B["Tooltip bên trong<br/>→ BỊ CẮT ✂️"]
-    C["Portal → body"] --> D["Tooltip nổi tự do<br/>trên mọi thứ ✅"]
+```d2 title="1. Vấn đề: CSS clipping & z-index — sơ đồ 2"
+direction: right
+A: "Card overflow:hidden"
+B: "Tooltip bên trong\n→ BỊ CẮT ✂️"
+C: "Portal → body"
+D: "Tooltip nổi tự do\ntrên mọi thứ ✅"
+A -> B
+C -> D
 ```
 
 Giải pháp sạch nhất: **render phần tử nổi ra thẳng `document.body`** (hoặc một `#portal-root` riêng), thoát khỏi mọi ràng buộc CSS của cha — đó chính là portal.
@@ -134,11 +145,15 @@ function App() {
 }
 ```
 
-```mermaid
-graph TD
-    Click["Click ở button trong portal (DOM ở body)"] --> SE["React synthetic event"]
-    SE --> Bubble["Bubble theo CÂY REACT (fiber.return)"]
-    Bubble --> Parent["onClick của div cha bắt được ✅"]
+```d2 title="3.1 Event bubbling đi theo cây React — sơ đồ 3"
+direction: down
+Click: "Click ở button trong portal (DOM ở body)"
+SE: "React synthetic event"
+Bubble: "Bubble theo CÂY REACT (fiber.return)"
+Parent: "onClick của div cha bắt được ✅"
+Click -> SE
+SE -> Bubble
+Bubble -> Parent
 ```
 
 <Callout type="info" title="Important">
@@ -168,11 +183,15 @@ Vì con vẫn ở đúng vị trí trong cây React, nó **vẫn đọc được
 
 Về mặt reconciler, portal được biểu diễn bằng một fiber loại đặc biệt: **`HostPortal`**. Trong quá trình reconciliation, React vẫn duyệt con của portal như một phần cây fiber bình thường (nên context/event hoạt động), nhưng ở pha **commit**, khi thao tác DOM, React gắn các node con vào **`stateNode.containerInfo`** (chính là `domNode` bạn truyền) thay vì vào DOM của cha.
 
-```mermaid
-graph TD
-    P["Fiber cha (Page)"] -->|child| PT["HostPortal fiber<br/>containerInfo = #portal-root"]
-    PT -->|child| M["Modal content fiber"]
-    M -.commit: gắn DOM vào.-> PR["#portal-root trong body"]
+```d2 title="4. Bên trong: HostPortal fiber — sơ đồ 4"
+direction: down
+P: "Fiber cha (Page)"
+PT: "HostPortal fiber\ncontainerInfo = #portal-root"
+M: "Modal content fiber"
+PR: "#portal-root trong body"
+P -> PT: "child"
+PT -> M: "child"
+M -> PR: "commit: gắn DOM vào" {style.stroke-dash: 3}
 ```
 
 <Callout type="info" title="Note">
@@ -255,31 +274,37 @@ Từ React 17 trở đi, listener delegated cho phần lớn event được gắ
 
 Khi native event xảy ra, React tìm fiber gần target DOM nhất, rồi đi ngược bằng con trỏ `return` để gom listener. Trong source, một phần việc này nằm ở các hàm kiểu `accumulateSinglePhaseListeners(...)`.
 
-```mermaid
-sequenceDiagram
-    participant DOM as Native DOM event
-    participant React as React event system
-    participant Fiber as Fiber tree
-    participant H as Handlers
-
-    DOM->>React: click tại button trong portal
-    React->>Fiber: tìm target fiber
-    Fiber->>Fiber: đi ngược qua fiber.return
-    Fiber-->>React: danh sách listener theo cây React
-    React->>H: chạy capture top-down
-    React->>H: chạy bubble bottom-up
+```d2 title="6.1 React dựng propagation path từ fiber.return — sơ đồ 5"
+shape: sequence_diagram
+DOM: "Native DOM event"
+React: "React event system"
+Fiber: "Fiber tree"
+H: "Handlers"
+DOM -> React: "click tại button trong portal"
+React -> Fiber: "tìm target fiber"
+Fiber -> Fiber: "đi ngược qua fiber.return"
+Fiber -> React: "danh sách listener theo cây React" {style.stroke-dash: 3}
+React -> H: "chạy capture top-down"
+React -> H: "chạy bubble bottom-up"
 ```
 
 Vì path được dựng từ **fiber tree**, cha React vẫn nhận được event dù DOM của portal nằm ở `body`:
 
-```mermaid
-graph TD
-    B["button DOM trong document.body"] --> N["native click"]
-    N --> R["React thu event"]
-    R --> T["target fiber: button"]
-    T --> P["return → Modal fiber"]
-    P --> A["return → Page/App fiber"]
-    A --> H["chạy onClick của cha React"]
+```d2 title="6.1 React dựng propagation path từ fiber.return — sơ đồ 6"
+direction: down
+B: "button DOM trong document.body"
+N: "native click"
+R: "React thu event"
+T: "target fiber: button"
+P: "return → Modal fiber"
+A: "return → Page/App fiber"
+H: "chạy onClick của cha React"
+B -> N
+N -> R
+R -> T
+T -> P
+P -> A
+A -> H
 ```
 
 Điểm cần nhớ: **DOM ancestry** và **React ancestry** khác nhau; SyntheticEvent ưu tiên React ancestry.
@@ -334,14 +359,21 @@ Với `HostPortal`, React đi theo nhánh **container** (`isContainer = true`) v
 | DOM thường | DOM element cha (`<div>`, `<main>`) | `appendChild(parent, child)` / `insertBefore(...)` | Node con nằm trong DOM cha |
 | Portal | `HostPortal.stateNode.containerInfo` | `appendChildToContainer(containerInfo, child)` / `insertInContainerBefore(...)` | Node con được gắn vào container đích |
 
-```mermaid
-graph TD
-    C["commit Placement"] --> F["getHostParentFiber"]
-    F --> Q{"Gặp fiber nào?"}
-    Q -->|"HostComponent"| A["appendChild vào DOM cha thường"]
-    Q -->|"HostRoot"| R["appendChildToContainer vào root"]
-    Q -->|"HostPortal"| P["appendChildToContainer vào containerInfo"]
-    P --> D["#modal-root / document.body"]
+```d2 title="7. Commit: node được chèn vào đâu — sơ đồ 7"
+direction: down
+C: "commit Placement"
+F: "getHostParentFiber"
+Q: "Gặp fiber nào?" {shape: diamond}
+A: "appendChild vào DOM cha thường"
+R: "appendChildToContainer vào root"
+P: "appendChildToContainer vào containerInfo"
+D: "#modal-root / document.body"
+C -> F
+F -> Q
+Q -> A: "HostComponent"
+Q -> R: "HostRoot"
+Q -> P: "HostPortal"
+P -> D
 ```
 
 Khi portal unmount, React cũng đi qua commit deletion và gỡ các host node khỏi `containerInfo`, đồng thời chạy cleanup effect/ref như subtree bình thường. Bạn chỉ cần điều khiển state để mount/unmount portal; không tự `removeChild` các node do React quản lý.
@@ -470,12 +502,16 @@ Bug điển hình:
 
 Nếu `.modal-inside-shell` nằm trong `.app-shell`, nó vẫn bị nhốt trong stacking context có `z-index: 1`. Một `.header` bên ngoài với `z-index: 10` có thể nổi lên trên modal, dù modal có `999999`.
 
-```mermaid
-graph TD
-    Body["body stacking context"] --> Header["header z-index:10"]
-    Body --> Shell["app-shell z-index:1 + transform"]
-    Shell --> Modal["modal z-index:999999<br/>chỉ thắng bên trong Shell"]
-    Header -."vẫn có thể nằm trên".-> Modal
+```d2 title="11. z-index & stacking context — đào sâu — sơ đồ 8"
+direction: down
+Body: "body stacking context"
+Header: "header z-index:10"
+Shell: "app-shell z-index:1 + transform"
+Modal: "modal z-index:999999\nchỉ thắng bên trong Shell"
+Body -> Header
+Body -> Shell
+Shell -> Modal
+Header -> Modal: "vẫn có thể nằm trên" {style.stroke-dash: 3}
 ```
 
 Portal khắc phục bằng cách đưa modal ra ngoài `.app-shell`, thường lên `document.body` hoặc `#modal-root` là sibling của root app:

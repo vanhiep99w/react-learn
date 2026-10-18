@@ -3,7 +3,9 @@ title: "Render Pipeline: Trigger → Render → Commit"
 description: "Ba pha React biến state thành pixel — trigger, render (element vs fiber, hàm thuần), commit ba pha con, thứ tự effect, StrictMode double render, và vì sao 'render' ≠ 'đụng DOM'"
 ---
 
-# Render Pipeline: Trigger → Render → Commit
+<span id="render-pipeline-trigger--render--commit" />
+
+**Render Pipeline: Trigger → Render → Commit**
 
 ## Mục lục
 
@@ -31,11 +33,15 @@ description: "Ba pha React biến state thành pixel — trigger, render (elemen
 
 Mỗi lần UI cập nhật, React đi qua đúng **3 pha**. Hiểu rạch ròi 3 pha này là nền tảng để sau đó hiểu Fiber, hiểu vì sao re-render, và hiểu mọi kỹ thuật tối ưu.
 
-```mermaid
-graph LR
-    T["1. Trigger<br/>(có gì đó cần update)"] --> R["2. Render<br/>(gọi component → tính cây mới)"]
-    R --> C["3. Commit<br/>(ghi thay đổi vào DOM thật)"]
-    C --> P["Browser Paint<br/>(vẽ pixel)"]
+```d2 title="Tổng quan — sơ đồ 1"
+direction: right
+T: "1. Trigger\n(có gì đó cần update)"
+R: "2. Render\n(gọi component → tính cây mới)"
+C: "3. Commit\n(ghi thay đổi vào DOM thật)"
+P: "Browser Paint\n(vẽ pixel)"
+T -> R
+R -> C
+C -> P
 ```
 
 <Callout type="info" title="Important">
@@ -185,13 +191,19 @@ Vì sao React khắt khe? Vì React có thể **render rồi bỏ đi** (trong C
 
 Sau khi render xong và biết **chính xác** chỗ nào khác, React bước vào Commit: thực hiện các thao tác DOM tối thiểu (thêm/xóa/sửa node), rồi chạy các effect tương ứng.
 
-```mermaid
-graph TD
-    A["Render xong: có danh sách thay đổi"] --> B["DOM mutations<br/>(appendChild, removeChild, set attribute)"]
-    B --> C["Chạy cleanup của useLayoutEffect cũ"]
-    C --> D["Chạy useLayoutEffect mới (đồng bộ)"]
-    D --> E["Browser paint"]
-    E --> F["Chạy useEffect (bất đồng bộ, sau paint)"]
+```d2 title="3. Pha Commit — áp thay đổi vào DOM — sơ đồ 2"
+direction: down
+A: "Render xong: có danh sách thay đổi"
+B: "DOM mutations\n(appendChild, removeChild, set attribute)"
+C: "Chạy cleanup của useLayoutEffect cũ"
+D: "Chạy useLayoutEffect mới (đồng bộ)"
+E: "Browser paint"
+F: "Chạy useEffect (bất đồng bộ, sau paint)"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
 ```
 
 ### 3.1 Ba pha con của Commit
@@ -231,32 +243,40 @@ Mặc định luôn dùng `useEffect`. Chỉ chuyển sang `useLayoutEffect` khi
 
 Sau commit, React trả quyền lại cho trình duyệt. Trình duyệt thực hiện **layout** (tính vị trí) và **paint** (vẽ pixel). Đây là bước duy nhất người dùng thực sự "nhìn thấy". `useEffect` chạy sau bước này nên không làm trễ thời điểm hiển thị.
 
-```mermaid
-sequenceDiagram
-    participant R as React (render)
-    participant C as React (commit)
-    participant B as Browser
-    participant E as useEffect
-    R->>C: cây WIP xong
-    C->>C: mutation + useLayoutEffect (đồng bộ)
-    C->>B: nhả quyền
-    B->>B: layout + paint (user THẤY ở đây)
-    B->>E: chạy useEffect (sau paint)
+```d2 title="4. Sau Commit — Browser Paint — sơ đồ 3"
+shape: sequence_diagram
+R: "React (render)"
+C: "React (commit)"
+B: "Browser"
+E: "useEffect"
+R -> C: "cây WIP xong"
+C -> C: "mutation + useLayoutEffect (đồng bộ)"
+C -> B: "nhả quyền"
+B -> B: "layout + paint (user THẤY ở đây)"
+B -> E: "chạy useEffect (sau paint)"
 ```
 
 ---
 
 ## 5. Toàn cảnh dòng thời gian
 
-```mermaid
-graph LR
-    A["setState"] --> B["Scheduler xếp lịch"]
-    B --> C["RENDER PHASE<br/>(gián đoạn được)"]
-    C --> D["Reconcile + tạo WIP tree"]
-    D --> E["COMMIT PHASE<br/>(đồng bộ, không ngắt)"]
-    E --> F["before mutation → mutation → layout"]
-    F --> G["Paint"]
-    G --> H["useEffect (passive)"]
+```d2 title="5. Toàn cảnh dòng thời gian — sơ đồ 4"
+direction: right
+A: "setState"
+B: "Scheduler xếp lịch"
+C: "RENDER PHASE\n(gián đoạn được)"
+D: "Reconcile + tạo WIP tree"
+E: "COMMIT PHASE\n(đồng bộ, không ngắt)"
+F: "before mutation → mutation → layout"
+G: "Paint"
+H: "useEffect (passive)"
+A -> B
+B -> C
+C -> D
+D -> E
+E -> F
+F -> G
+G -> H
 ```
 
 Điểm mấu chốt: **Render gián đoạn được, Commit thì không**. Đó là lý do mọi side effect "thấy được" phải nằm ở commit/effect, không phải trong thân render.

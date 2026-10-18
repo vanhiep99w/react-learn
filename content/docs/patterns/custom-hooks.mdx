@@ -3,7 +3,9 @@ title: "Custom Hooks"
 description: "Trích xuất logic stateful tái dùng — quy tắc hook, ví dụ useToggle/useFetch/useDebounce, và lỗi thường gặp"
 ---
 
-# Custom Hooks
+<span id="custom-hooks" />
+
+**Custom Hooks**
 
 ## Mục lục
 
@@ -140,16 +142,16 @@ function Search() {
 }
 ```
 
-```mermaid
-sequenceDiagram
-    participant U as User gõ
-    participant H as useDebounce
-    participant API
-    U->>H: "r"
-    U->>H: "re" (huỷ timer cũ)
-    U->>H: "rea" (huỷ timer cũ)
-    Note over H: ngừng gõ 400ms
-    H->>API: search("rea") — gọi 1 lần
+```d2 title="4. Ví dụ: useDebounce — sơ đồ 1"
+shape: sequence_diagram
+U: "User gõ"
+H: "useDebounce"
+API: "API"
+U -> H: "\"r\""
+U -> H: "\"re\" (huỷ timer cũ)"
+U -> H: "\"rea\" (huỷ timer cũ)"
+H."ngừng gõ 400ms"
+H -> API: "search(\"rea\") — gọi 1 lần"
 ```
 
 ---
@@ -158,35 +160,94 @@ sequenceDiagram
 
 Đóng gói trạng thái loading/error/data:
 
-```tsx
-import { useState, useEffect } from 'react';
+Phần đáng chú ý không phải `fetch`, mà là cờ riêng cho mỗi lần Effect chạy. Các bước dưới đây chỉ dẫn đọc code, không thực thi request.
 
-type State<T> = { data: T | null; loading: boolean; error: Error | null };
+```code-walkthrough
+title: useFetch bỏ qua response của Effect đã cleanup
+language: tsx
+snapshots:
+  - id: hook
+    title: useFetch.tsx
+    code: |-
+      import { useState, useEffect } from 'react';
+      
+      type State<T> = { data: T | null; loading: boolean; error: Error | null };
+      
+      function useFetch<T>(url: string): State<T> {
+        const [state, setState] = useState<State<T>>({ data: null, loading: true, error: null });
+      
+        useEffect(() => {
+          let cancelled = false;
+          setState({ data: null, loading: true, error: null });
+      
+          fetch(url)
+            .then((r) => r.json())
+            .then((data) => { if (!cancelled) setState({ data, loading: false, error: null }); })
+            .catch((error) => { if (!cancelled) setState({ data: null, loading: false, error }); });
+      
+          return () => { cancelled = true; }; // tránh setState sau khi unmount / url đổi
+        }, [url]);
+      
+        return state;
+      }
+      
+      function UserProfile({ id }: { id: number }) {
+        const { data, loading, error } = useFetch<{ name: string }>(`/api/users/${id}`);
+        if (loading) return <p>Đang tải…</p>;
+        if (error) return <p>Lỗi: {error.message}</p>;
+        return <h1>{data!.name}</h1>;
+      }
+steps:
+  - id: reset
+    snapshot: hook
+    title: Mỗi Effect có cờ cancelled riêng
+    description: Khi URL đổi, trạng thái loading được khởi tạo cho request mới; cờ không được dùng chung giữa hai Effect.
+    ranges: [[8, 10]]
+  - id: response
+    snapshot: hook
+    title: Chỉ Effect còn hiệu lực được cập nhật state
+    description: Response hoặc lỗi của request cũ vẫn có thể về; kiểm tra cancelled ngăn chúng ghi đè dữ liệu mới.
+    ranges: [[12, 15]]
+  - id: cleanup
+    snapshot: hook
+    title: Cleanup vô hiệu hóa response cũ
+    description: Cờ này không hủy request trên mạng. Nó chỉ chặn cập nhật state sau khi URL đổi hoặc component unmount.
+    ranges: [[17, 18]]
+```
 
-function useFetch<T>(url: string): State<T> {
-  const [state, setState] = useState<State<T>>({ data: null, loading: true, error: null });
+Transcript HTTP sau là **hợp đồng minh họa** cho `/api/users/1`, không phải endpoint được site tài liệu này cung cấp hay request đã chạy. Với `404`, `fetch` vẫn resolve và `r.json()` không tự throw; khi dùng hook ở production, kiểm tra `r.ok` rồi throw để nhánh `.catch` nhận HTTP error.
 
-  useEffect(() => {
-    let cancelled = false;
-    setState({ data: null, loading: true, error: null });
-
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => { if (!cancelled) setState({ data, loading: false, error: null }); })
-      .catch((error) => { if (!cancelled) setState({ data: null, loading: false, error }); });
-
-    return () => { cancelled = true; }; // tránh setState sau khi unmount / url đổi
-  }, [url]);
-
-  return state;
-}
-
-function UserProfile({ id }: { id: number }) {
-  const { data, loading, error } = useFetch<{ name: string }>(`/api/users/${id}`);
-  if (loading) return <p>Đang tải…</p>;
-  if (error) return <p>Lỗi: {error.message}</p>;
-  return <h1>{data!.name}</h1>;
-}
+```protocol-exchange
+title: useFetch nhận dữ liệu hoặc HTTP error
+variants:
+  - id: found
+    title: Có user
+    request:
+      method: GET
+      url: /api/users/1
+    response:
+      status: 200
+      headers:
+        - id: content-type
+          name: Content-Type
+          value: application/json
+      body:
+        kind: json
+        json: '{"name":"Hiep"}'
+  - id: missing
+    title: Không tìm thấy user
+    request:
+      method: GET
+      url: /api/users/1
+    response:
+      status: 404
+      headers:
+        - id: content-type
+          name: Content-Type
+          value: application/json
+      body:
+        kind: json
+        json: '{"error":"User not found"}'
 ```
 
 <Callout type="info" title="Tip">
@@ -232,10 +293,15 @@ Bật ESLint plugin `eslint-plugin-react-hooks` để bắt vi phạm tự độ
 
 React **không** biết tên biến bạn gán. Nó lưu state của mỗi hook vào một **danh sách liên kết** theo đúng **thứ tự gọi** trong fiber (xem [Fiber](/react-internals/fiber-reconciliation/)). Mỗi lần render, nó đi theo cùng thứ tự để lấy đúng ô state.
 
-```mermaid
-graph LR
-    H1["Hook 1: useState(text)"] --> H2["Hook 2: useState(count)"] --> H3["Hook 3: useEffect"]
-    N["React khớp theo THỨ TỰ, không theo tên"] -.-> H1
+```d2 title="6.1 Vì sao thứ tự gọi hook quan trọng — sơ đồ 2"
+direction: right
+H1: "Hook 1: useState(text)"
+H2: "Hook 2: useState(count)"
+H3: "Hook 3: useEffect"
+N: "React khớp theo THỨ TỰ, không theo tên"
+H1 -> H2
+H2 -> H3
+N -> H1 {style.stroke-dash: 3}
 ```
 
 <Callout type="warn" title="Warning">

@@ -53,19 +53,24 @@ Sự khác biệt không nằm ở việc có dùng state hay không. Nó nằm 
 
 Một ô input luôn có giá trị hiện tại. Câu hỏi là giá trị đó được quyết định ở đâu.
 
-```mermaid
-flowchart LR
-  subgraph Controlled
-    U1["Người dùng gõ"] --> E1["onChange"]
-    E1 --> S["React state"]
-    S --> V["value / checked prop"]
-    V --> I1["DOM input"]
-  end
-
-  subgraph Uncontrolled
-    U2["Người dùng gõ"] --> I2["DOM input giữ giá trị"]
-    I2 --> R["ref hoặc FormData khi cần đọc"]
-  end
+```d2 title="Mô hình tư duy: ai sở hữu state? — sơ đồ 1"
+direction: right
+group1: "Controlled" {}
+group2: "Uncontrolled" {}
+group1.U1: "Người dùng gõ"
+group1.E1: "onChange"
+group1.S: "React state"
+group1.V: "value / checked prop"
+group1.I1: "DOM input"
+group2.U2: "Người dùng gõ"
+group2.I2: "DOM input giữ giá trị"
+group2.R: "ref hoặc FormData khi cần đọc"
+group1.U1 -> group1.E1
+group1.E1 -> group1.S
+group1.S -> group1.V
+group1.V -> group1.I1
+group2.U2 -> group2.I2
+group2.I2 -> group2.R
 ```
 
 Với controlled input, DOM vẫn phản ánh ký tự người dùng vừa gõ trước tiên. Nhưng sau event, React state được cập nhật và lần render tiếp theo truyền giá trị về input. Vì thế state mới là nơi quyết định UI cuối cùng.

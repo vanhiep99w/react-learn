@@ -3,7 +3,9 @@ title: "Fiber & Reconciliation"
 description: "Kiến trúc Fiber, work loop beginWork/completeWork, thuật toán diffing O(n), double buffering, lanes & bailout — mổ xẻ chi tiết cách React biến cây mới thành DOM"
 ---
 
-# Fiber & Reconciliation
+<span id="fiber--reconciliation" />
+
+**Fiber & Reconciliation**
 
 ## Mục lục
 
@@ -42,11 +44,15 @@ description: "Kiến trúc Fiber, work loop beginWork/completeWork, thuật toá
 
 **Reconciliation** là quá trình React so sánh cây UI mới (vừa render) với cây cũ để tìm ra **tập thao tác DOM tối thiểu**. **Fiber** là kiến trúc dữ liệu + thuật toán (ra mắt từ React 16) giúp quá trình đó có thể **chia nhỏ, tạm dừng, tiếp tục, ưu tiên và hủy** thay vì chạy một mạch.
 
-```mermaid
-graph LR
-    A["Element tree mới<br/>(object nhẹ, dùng xong vứt)"] --> B["Reconciler<br/>so sánh với Fiber cũ"]
-    B --> C["Fiber tree WIP<br/>(gắn flags: chỗ nào cần đổi)"]
-    C --> D["Renderer<br/>(react-dom) áp vào DOM ở pha commit"]
+```d2 title="Tổng quan — sơ đồ 1"
+direction: right
+A: "Element tree mới\n(object nhẹ, dùng xong vứt)"
+B: "Reconciler\nso sánh với Fiber cũ" {icon: "../assets/react.svg"}
+C: "Fiber tree WIP\n(gắn flags: chỗ nào cần đổi)"
+D: "Renderer\n(react-dom) áp vào DOM ở pha commit"
+A -> B
+B -> C
+C -> D
 ```
 
 <Callout type="info" title="Important">
@@ -57,15 +63,19 @@ graph LR
 
 **Bức tranh toàn cảnh — đặt Fiber vào đúng chỗ trong pipeline:**
 
-```mermaid
-graph TD
-    T["Trigger: setState / initial render"] --> RP["RENDER PHASE (gián đoạn được)"]
-    subgraph RP[" "]
-    direction LR
-    BW["beginWork<br/>đi xuống, reconcile children"] --> CW["completeWork<br/>đi lên, tạo DOM node, gom flags"]
-    end
-    RP --> CP["COMMIT PHASE (nguyên tử, KHÔNG gián đoạn)"]
-    CP --> P["Browser paint"]
+```d2 title="Tổng quan — sơ đồ 2"
+direction: down
+RP: "RENDER PHASE (gián đoạn được)" {direction: right}
+T: "Trigger: setState / initial render"
+RP.BW: "beginWork\nđi xuống, reconcile children"
+RP.CW: "completeWork\nđi lên, tạo DOM node, gom flags"
+RP: "RP"
+CP: "COMMIT PHASE (nguyên tử, KHÔNG gián đoạn)"
+P: "Browser paint"
+T -> RP
+RP.BW -> RP.CW
+RP -> CP
+CP -> P
 ```
 
 Bài [Render Pipeline](/react-internals/render-pipeline/) mô tả 3 pha ở mức khái niệm; bài này phóng to vào **bên trong pha Render** — nơi Fiber thực sự sống.
@@ -82,14 +92,24 @@ Trước React 16, reconciliation chạy bằng **đệ quy đồng bộ** trên
 - Cây lớn (vài nghìn node) → main thread bị khóa hàng chục đến hàng trăm ms.
 - Trong lúc đó: animation đứng hình, gõ phím không phản hồi, scroll giật. Trình duyệt **không kịp** vẽ frame mới (mỗi frame chỉ có ~16ms ở 60fps).
 
-```mermaid
-graph TD
-    subgraph "Stack reconciler (đồng bộ)"
-    A1["Bắt đầu render cây lớn"] --> A2["...chạy 80ms liền, không nhả..."] --> A3["Xong. Suốt 80ms đó UI đơ"]
-    end
-    subgraph "Fiber (time slicing)"
-    B1["Làm ~5ms"] --> B2["Hết deadline → nhường browser"] --> B3["Browser xử input/paint"] --> B4["React làm tiếp 5ms"] --> B5["..."]
-    end
+```d2 title="1.1 Stack reconciler cũ và sự ’không dừng được’ — sơ đồ 3"
+direction: down
+group1: "Stack reconciler (đồng bộ)" {}
+group2: "Fiber (time slicing)" {}
+group1.A1: "Bắt đầu render cây lớn"
+group1.A2: "...chạy 80ms liền, không nhả..."
+group1.A3: "Xong. Suốt 80ms đó UI đơ"
+group2.B1: "Làm ~5ms"
+group2.B2: "Hết deadline → nhường browser"
+group2.B3: "Browser xử input/paint"
+group2.B4: "React làm tiếp 5ms"
+group2.B5: "..."
+group1.A1 -> group1.A2
+group1.A2 -> group1.A3
+group2.B1 -> group2.B2
+group2.B2 -> group2.B3
+group2.B3 -> group2.B4
+group2.B4 -> group2.B5
 ```
 
 ### 1.2 Ý tưởng cốt lõi: biến call stack thành dữ liệu
@@ -195,13 +215,18 @@ Gọi hook trong `if`/`for`/sau `return` sớm làm **lệch danh sách hook**. 
 
 Cây fiber được duyệt **depth-first** dùng `child` → `sibling` → `return`:
 
-```mermaid
-graph TD
-    Root --> A
-    A -->|child| B
-    B -->|sibling| C
-    C -->|sibling| D
-    A -->|return ngược lên khi hết con| Root
+```d2 title="2.2 Vì sao hooks là linked list trong memoizedState — sơ đồ 4"
+direction: down
+Root: "Root"
+A: "A"
+B: "B"
+C: "C"
+D: "D"
+Root -> A
+A -> B: "child"
+B -> C: "sibling"
+C -> D: "sibling"
+A -> Root: "return ngược lên khi hết con"
 ```
 
 ---
@@ -217,14 +242,16 @@ React giữ **hai** cây fiber cùng lúc — kỹ thuật mượn từ đồ ho
 
 Hai cây trỏ tới nhau qua trường `alternate`. React dựng xong cây WIP trong "hậu trường" (chưa đụng DOM); tới pha commit nó chỉ cần **hoán đổi con trỏ gốc**: WIP trở thành current. Nhờ vậy người dùng **không bao giờ** thấy trạng thái nửa vời.
 
-```mermaid
-graph LR
-    subgraph "Trước commit"
-    C1[current: đang hiển thị] -.alternate.- W1[WIP: đang dựng + diff]
-    end
-    subgraph "Sau commit (hoán đổi)"
-    W2[WIP → trở thành current MỚI] -.alternate.- C2[current cũ → tái dùng làm WIP lần sau]
-    end
+```d2 title="3. Cây Fiber & Double Buffering — sơ đồ 5"
+direction: right
+group1: "Trước commit" {}
+group2: "Sau commit (hoán đổi)" {}
+group1.C1: "current: đang hiển thị"
+group1.W1: "WIP: đang dựng + diff"
+group2.W2: "WIP → trở thành current MỚI"
+group2.C2: "current cũ → tái dùng làm WIP lần sau"
+group1.C1 -- group1.W1: "alternate" {style.stroke-dash: 3}
+group2.W2 -- group2.C2: "alternate" {style.stroke-dash: 3}
 ```
 
 <Callout type="info" title="Tip">
@@ -261,14 +288,21 @@ function performUnitOfWork(fiber: Fiber) {
 
 ### 4.1 Hai pha của một đơn vị công việc
 
-```mermaid
-graph TD
-    BW["beginWork(fiber)"] -->|"gọi component / reconcile children"| HC{"Có con?"}
-    HC -->|"Có"| DOWN["đi xuống child → beginWork tiếp"]
-    HC -->|"Không"| CW["completeWork(fiber)"]
-    CW --> SIB{"Có sibling?"}
-    SIB -->|"Có"| NEXT["sang sibling → beginWork"]
-    SIB -->|"Không"| UP["return lên cha → completeWork cha"]
+```d2 title="4.1 Hai pha của một đơn vị công việc — sơ đồ 6"
+direction: down
+BW: "beginWork(fiber)"
+HC: "Có con?" {shape: diamond}
+DOWN: "đi xuống child → beginWork tiếp"
+CW: "completeWork(fiber)"
+SIB: "Có sibling?" {shape: diamond}
+NEXT: "sang sibling → beginWork"
+UP: "return lên cha → completeWork cha"
+BW -> HC: "gọi component / reconcile children"
+HC -> DOWN: "Có"
+HC -> CW: "Không"
+CW -> SIB
+SIB -> NEXT: "Có"
+SIB -> UP: "Không"
 ```
 
 | Lượt | Hàm | Làm gì |
@@ -286,13 +320,17 @@ DOM node thật được **tạo ở `completeWork`** (trong pha render, trong b
 
 Sau khi reconcile, mỗi fiber có thay đổi được gắn `flags`. Khi `completeWork` đi lên, nó **gộp** flags của con vào `subtreeFlags` của cha. Kết quả: ở pha commit, React không cần duyệt lại toàn bộ cây — chỉ cần đi theo những nhánh có `subtreeFlags !== 0`.
 
-```mermaid
-graph TD
-    Root["Root (subtreeFlags: Update)"] --> List["List (subtreeFlags: Update)"]
-    List --> I1["Item#1 (flags: 0 — sạch)"]
-    List --> I2["Item#2 (flags: Update ✏️)"]
-    List --> I3["Item#3 (flags: 0 — sạch)"]
-    style I2 fill:#ffe6cc
+```d2 title="4.2 Effect list — danh sách ’việc cần commit’ — sơ đồ 7"
+direction: down
+Root: "Root (subtreeFlags: Update)"
+List: "List (subtreeFlags: Update)"
+I1: "Item#1 (flags: 0 — sạch)"
+I2: "Item#2 (flags: Update ✏️)" {style.fill: "#ffe6cc"}
+I3: "Item#3 (flags: 0 — sạch)"
+Root -> List
+List -> I1
+List -> I2
+List -> I3
 ```
 
 Chỉ `Item#2` có việc. Nhờ `subtreeFlags`, React đi thẳng tới nó ở commit, bỏ qua Item#1 và #3.
@@ -301,13 +339,19 @@ Chỉ `Item#2` có việc. Nhờ `subtreeFlags`, React đi thẳng tới nó ở
 
 Trong `beginWork`, nếu React phát hiện một fiber **không cần render lại** (props không đổi theo `Object.is`, state không đổi, context không đổi, và không có update đang chờ), nó thực hiện **bailout**: bỏ qua việc gọi lại component đó. Thậm chí nếu cả `childLanes` cũng trống, React clone luôn cả subtree con mà **không** đi vào — gọi là `bailoutOnAlreadyFinishedWork`.
 
-```mermaid
-graph TD
-    A["beginWork(fiber)"] --> Q{"props/state/context đổi?<br/>hay có update chờ?"}
-    Q -->|"Có"| R["Render: gọi component, reconcile children"]
-    Q -->|"Không"| B{"childLanes có việc?"}
-    B -->|"Có"| C["Clone con, đi xuống xử lý con"]
-    B -->|"Không"| D["BAILOUT: bỏ qua cả nhánh ✅"]
+```d2 title="4.3 Bailout — khi React bỏ qua cả subtree — sơ đồ 8"
+direction: down
+A: "beginWork(fiber)"
+Q: "props/state/context đổi?\nhay có update chờ?" {shape: diamond}
+R: "Render: gọi component, reconcile children"
+B: "childLanes có việc?" {shape: diamond}
+C: "Clone con, đi xuống xử lý con"
+D: "BAILOUT: bỏ qua cả nhánh ✅"
+A -> Q
+Q -> R: "Có"
+Q -> B: "Không"
+B -> C: "Có"
+B -> D: "Không"
 ```
 
 <Callout type="info" title="Note">
@@ -419,11 +463,15 @@ Từ React 18, mỗi update được gán vào một **lane** — một bit tron
 | `TransitionLanes` | Thấp | `startTransition`, `useDeferredValue` |
 | `IdleLane` | Thấp nhất | Việc nền không ai chờ |
 
-```mermaid
-graph LR
-    U1["Gõ phím → InputContinuousLane"] --> S["Scheduler chọn lane ưu tiên cao nhất đang chờ"]
-    U2["startTransition → TransitionLane"] --> S
-    S --> R["Render nhóm lane đó trước; lane thấp có thể bị ngắt giữa chừng"]
+```d2 title="6.1 Lanes — hệ thống ưu tiên bằng bitmask — sơ đồ 9"
+direction: right
+U1: "Gõ phím → InputContinuousLane"
+S: "Scheduler chọn lane ưu tiên cao nhất đang chờ"
+U2: "startTransition → TransitionLane"
+R: "Render nhóm lane đó trước; lane thấp có thể bị ngắt giữa chừng"
+U1 -> S
+U2 -> S
+S -> R
 ```
 
 <Callout type="info" title="Note">
@@ -436,9 +484,11 @@ graph LR
 
 Pha **commit** phải **nguyên tử (atomic)**: React áp tất cả mutation DOM, chạy layout effect, hoán đổi cây current trong **một lượt không nhả**. Nếu commit bị ngắt giữa chừng, user sẽ thấy DOM ở trạng thái nửa vời (một nửa cây mới, một nửa cũ) — không chấp nhận được.
 
-```mermaid
-graph LR
-    RP["Render phase: gián đoạn / hủy / làm lại thoải mái 🔄"] --> CP["Commit phase: chạy một mạch, không nhả 🔒"]
+```d2 title="6.2 Vì sao commit KHÔNG gián đoạn được — sơ đồ 10"
+direction: right
+RP: "Render phase: gián đoạn / hủy / làm lại thoải mái 🔄"
+CP: "Commit phase: chạy một mạch, không nhả 🔒"
+RP -> CP
 ```
 
 ---
