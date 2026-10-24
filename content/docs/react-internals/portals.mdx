@@ -274,27 +274,7 @@ Từ React 17 trở đi, listener delegated cho phần lớn event được gắ
 
 Khi native event xảy ra, React tìm fiber gần target DOM nhất, rồi đi ngược bằng con trỏ `return` để gom listener. Trong source, một phần việc này nằm ở các hàm kiểu `accumulateSinglePhaseListeners(...)`.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="6.1 React dựng propagation path từ fiber.return — sơ đồ 5" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(DOM -> React)[0]"
-#         description: "Native DOM event → React event system: click tại button trong portal"
-#       - edge: "(React -> Fiber)[0]"
-#         description: "React event system → Fiber tree: tìm target fiber"
-#       - edge: "(Fiber -> Fiber)[0]"
-#         description: "Fiber tree → Fiber tree: đi ngược qua fiber.return"
-#       - edge: "(Fiber -> React)[0]"
-#         description: "Fiber tree → React event system: danh sách listener theo cây React"
-#       - edge: "(React -> H)[0]"
-#         description: "React event system → Handlers: chạy capture top-down"
-#       - edge: "(React -> H)[1]"
-#         description: "React event system → Handlers: chạy bubble bottom-up"
-# @endflow
+```d2 title="6.1 React dựng propagation path từ fiber.return — sơ đồ 5"
 shape: sequence_diagram
 DOM: "Native DOM event"
 React: "React event system"

@@ -5463,7 +5463,7 @@
           "chạy bubble bottom-up"
         ]
       ],
-      "d2Sha256": "104564e930ba0b669310f4d1800aba91d419bf358e6477692d2e2ba846dff983"
+      "d2Sha256": "9c0c1c30f934b30921bb76635ae8dc3f301410240f72798d4cb47dfffafd5d44"
     },
     {
       "file": "content/docs/react-internals/portals.mdx",
@@ -6375,7 +6375,7 @@
           "layout và paint nếu cần"
         ]
       ],
-      "d2Sha256": "5c6d5f04593175e7b63b0d84e99dc71edf778863fe31dfe9e420d7fdcf61b5fe"
+      "d2Sha256": "b4aa93de0cf27d5acd7aca1705725d553208a74722879e8f70f6faac62cfa191"
     },
     {
       "file": "content/docs/react-internals/virtual-dom-hoat-dong-nhu-the-nao.mdx",
