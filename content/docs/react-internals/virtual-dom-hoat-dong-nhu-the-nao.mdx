@@ -374,7 +374,31 @@ root.render(<App />);
 
 Khi `setState` được gọi, React không sửa DOM ngay tại dòng đó. React xếp lịch một update.
 
-```d2 title="5.2 Những lần cập nhật sau — sơ đồ 4"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="5.2 Những lần cập nhật sau — sơ đồ 4" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(U -> C)[0]"
+#         description: "User → Component: click"
+#       - edge: "(C -> R)[0]"
+#         description: "Component → Reconciler: setState xếp lịch update"
+#       - edge: "(R -> C)[0]"
+#         description: "Reconciler → Component: gọi lại component"
+#       - edge: "(C -> R)[1]"
+#         description: "Component → Reconciler: React Element mới"
+#       - edge: "(R -> R)[0]"
+#         description: "Reconciler → Reconciler: đối chiếu với Fiber hiện tại"
+#       - edge: "(R -> RD)[0]"
+#         description: "Reconciler → react-dom: flags Placement / Update / Deletion"
+#       - edge: "(RD -> B)[0]"
+#         description: "react-dom → Browser: insert / update / remove DOM"
+#       - edge: "(B -> B)[0]"
+#         description: "Browser → Browser: layout và paint nếu cần"
+# @endflow
 shape: sequence_diagram
 U: "User"
 C: "Component"
